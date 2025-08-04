@@ -1,0 +1,3 @@
+/home/ubuntu/cpp/src/build/CMakeFiles/MqttTransport.dir
+/home/ubuntu/cpp/src/build/CMakeFiles/edit_cache.dir
+/home/ubuntu/cpp/src/build/CMakeFiles/rebuild_cache.dir
