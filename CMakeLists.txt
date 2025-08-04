@@ -24,3 +24,9 @@ target_link_libraries(MqttTransport
     yaml-cpp
     pthread
 )
+
+file(COPY 
+    ${CMAKE_SOURCE_DIR}/szo.yml 
+    ${CMAKE_SOURCE_DIR}/szo_sanya_vessel.yml
+    DESTINATION ${CMAKE_BINARY_DIR}
+)
