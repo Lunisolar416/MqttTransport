@@ -88,14 +88,21 @@ struct RadarTargetsMsg
 RadarTargetsMsg jsonToRadarTargets(const nlohmann::json &input);
 
 // 目标识别协议 0121
+// 目标识别协议 0121
 struct TargetRecognition
 {
-    uint16_t batch; // 批号
-    uint8_t sign;   // 属性 0：无效，1敌，2敌同盟，3我，4友，5中立，6不明。
-    uint8_t type;   // 类型 0：无效，1：船舶，2：浮标
-    uint8_t color;  // 颜色
-                   // 0：无效，1：红色，2：黄色，3：绿色，4：蓝色，5：紫色，6：灰色，7：黑色，8：白色
-    char code[16]; // 识别船号 0：无效
+    int batch;
+    int sign;
+    int source;
+    int type;
+    int color;
+
+    char code[16]; // 识别舷号：16字节，0=无效，全1=不明（如用 memset 全1）
+
+    uint16_t confidence;  // 置信度，实际值 = value * 0.1；范围0~1000，单位0.1
+    uint16_t height;      // 距离，实际值 = value * 0.1 米
+    uint16_t orientation; // 水平方位，实际值 = value * 0.1 度
+    uint16_t pitch;       // 垂直方位，实际值 = value * 0.1 度
 };
 
 // 激光雷达目标协议 0131

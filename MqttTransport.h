@@ -136,8 +136,7 @@ class MqttTransport : public virtual mqtt::callback, public virtual mqtt::iactio
     bool is_simple_waterarea = false;
 
     // 0121
-    // std::unordered_map<uint16_t, TargetRecognition> target_recongnition_;
-    std::unordered_map<int, int> target_recongnition_;
+    std::unordered_map<int, TargetRecognition> target_recongnition_;
 
     // 0151
     std::unordered_map<uint16_t, TargetRevision> target_revisions_;

@@ -564,13 +564,23 @@ void MqttTransport::handle_0121(const nlohmann::json &json_msg, const std::strin
 
         publish("0E24H-1", output);
         */
-
+        TargetRecognition targetRec_;
         const auto &content = json_msg.at("content");
-        int batch = content.value("batch", 0);
-        int type = content.value("type", 0);
+        targetRec_.batch = content.value("batch", 0.0);
+        targetRec_.sign = content.value("sign", 0);
+        targetRec_.source = content.value("source", 0);
+        targetRec_.type = content.value("type", 0.0);
+        {
+            std::string code_str = content.value("code", "");
+            std::strncpy(targetRec_.code, code_str.c_str(), sizeof(targetRec_.code) - 1);
+            targetRec_.code[sizeof(targetRec_.code) - 1] = '\0';
+        }
+        targetRec_.confidence = content.value("confidence", 0.0);
+        targetRec_.height = content.value("height", 0.0);
+        targetRec_.orientation = content.value("orientation", 0.0);
+        targetRec_.pitch = content.value("pitch", 0.0);
 
-        std::cout << "batch " << batch << " type " << type << std::endl;
-        target_recongnition_[batch] = type;
+        target_recongnition_[targetRec_.batch] = targetRec_;
     }
     catch (const std::exception &e)
     {
@@ -1106,7 +1116,14 @@ void MqttTransport::mergeAndOutput(const std::vector<int> &targetIds)
         // 0121
         auto rec_it = target_recongnition_.find(id);
         if (rec_it != target_recongnition_.end())
-            tgt["type"] = rec_it->second;
+        {
+            const auto &rec = rec_it->second;
+            tgt["sign"] = rec.sign;
+            tgt["source"] = rec.source;
+            tgt["type"] = rec.type;
+            tgt["color"] = rec.color;
+            tgt["code"] = rec.code;
+        }
         else
             std::cerr << "cant't find id for 0121" << std::endl;
 
@@ -1171,6 +1188,21 @@ void MqttTransport::mergeAndOutput(const std::vector<int> &targetIds)
         tgt["shipHeight"] = 0;
         tgt["MMSI"] = 0;
         tgt["source"] = 0;
+
+        // 0121
+        auto rec_it = target_recongnition_.find(mt.id);
+        if (rec_it != target_recongnition_.end())
+        {
+            const auto &rec = rec_it->second;
+            tgt["sign"] = rec.sign;
+            tgt["source"] = rec.source;
+            tgt["type"] = rec.type;
+            tgt["color"] = rec.color;
+            tgt["code"] = rec.code;
+        }
+        else
+            std::cerr << "cant't find id for 0121" << std::endl;
+
         // 如果有目标修订协议？
         auto rev_it = target_revisions_.find(mt.id);
         if (rev_it != target_revisions_.end())
