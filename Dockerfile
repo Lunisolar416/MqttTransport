@@ -1,6 +1,6 @@
 FROM ubuntu:22.04
 
-ENV DEBIAN_FRONTEND=teletype
+ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y \
     build-essential \
@@ -49,4 +49,4 @@ RUN rm -rf build && \
     cmake .. && \
     make -j$(nproc)
 
-CMD ["/bin/bash"]
+CMD ["/app/build/MqttTransport"]

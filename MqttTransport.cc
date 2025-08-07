@@ -651,7 +651,10 @@ void MqttTransport::handle_0411(const nlohmann::json &json_msg, const std::strin
         infoUnitContent["accelerationX"] = content.value("accX", 0.0);
         infoUnitContent["accelerationY"] = content.value("accY", 0.0);
         infoUnitContent["accelerationZ"] = content.value("accZ", 0.0);
-
+        infoUnitContent["headingAngleAcceleration"] = content.value("headingAcc", 0.0);
+        infoUnitContent["simulationRatio"] = 1;
+        infoUnitContent["targetSimulateSign"] = 0;
+        infoUnitContent["cruiseMode"] = 1;
         // infoUnitHead
         nlohmann::json infoUnitHead;
         infoUnitHead["sourcePlatformId"] = 3073;
