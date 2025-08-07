@@ -1,0 +1,500 @@
+cli:
+  namespace: /
+usfs_bridge:
+  general:
+    protocol: mqtt
+    mqtt:
+      server_uri: "tcp://192.1.20.53:1883"
+      username: "third_client"
+      password: "third_client"
+      version: 3 # MQTTVERSION_3_1
+    flags:
+      # use received local timestamp for frame
+      # instead of that reported by sensor
+      # to avoid incorrect time info from sensor
+      use_timestamp_recv: true
+      # default format to parse and build fused object msgs
+      default_fused_object_report_format: 2
+  driver:
+    sources:
+      - name: nav_radar
+        adapter: SzoNavRadarDriver
+        params:
+          debug_mode: false
+          velocity_unit: 0 # knots
+      - name: ais_moving_target
+        adapter: SzoAISMovingTargetDriver
+        params:
+          debug_mode: false
+          velocity_unit: 0 # knots
+          # lon_range: [110.0, 115.0]
+          # lat_range: [20.0, 25.0]
+      # - name: servo
+      #   # from 0F54H-9 and 0E24H-1
+      #   adapter: SzoServoDriver
+      #   params:
+      #     debug_mode: true
+      #     receive_interval: 10.0
+      #     reset_interval: 15.0
+      #     lost_count_threshold: 15
+      - name: pmtd
+        adapter: SzoNavRadarDriver
+        params:
+          debug_mode: false
+          velocity_unit: 0 # knots
+      - name: vision_result
+        # from 0E24H-1 only
+        adapter: SzoCameraDriver
+      - name: laser_radar
+        adapter: SzoNavRadarDriver
+        params:
+          debug_mode: false
+          velocity_unit: 0 # knots
+      - name: vessel_site_info
+        adapter: SzoVesselSiteInfoDriver
+        params:
+          velocity_unit: 0 # knots
+    mqtt_topics:
+      vessel_site_info: 0E9DH-3
+      nav_radar: 0E23H-0
+      pmtd: 0E19H-0
+      vision_result: 0E24H-1
+      laser_radar: 0E25H-2
+      ais_moving_target: 0E30H-1
+      servo:
+        - name: servo_motion_attributes
+          topic: 0F54H-9
+          id: 3939 # 0x0F54
+          extent_id: 9
+          fields: [1]
+        - name: servo_identification
+          topic: 0E24H-1
+          id: 3618 # 0x0E24
+          extent_id: 1
+          fields: [3]
+        - name: servo_name
+          topic: 0E24H-2
+          id: 3618 # 0x0E24
+          extent_id: 2
+          fields: [6]
+          marked_lost: true
+  reporter:
+    sinks:
+      - name: szo_object_status
+        adapter: SzoObjectStatusReporter
+        params:
+          head:
+            sendIP: "192.1.20.80"
+            destIP: "192.1.20.53"
+            packageSerialNumber: 1234
+            packageConfirmNumber: 4321
+            packageId: 1
+          infoUnitHead:
+            infoUnitId: 3
+            sourcePlatformId: 1793 # 0x0701
+            destPlatformId: 65535 # 0xFFFF
+            infoSourceTypeId: 0
+    app_status:
+      mqtt_topics:
+        heartbeat: MSGID_APP_HEARTBEAT
+    object_status:
+      report_with_full_measurement_luts: false
+      report_iff_target_exists: false
+      velocity_unit: 0 # knots
+      publish_frequency: -1.0
+      mqtt_topics:
+        fused:
+          - name: veseel_surface_motion_attributes
+            topic: 0E20H-0
+            id: 3616 # 0x0E21
+            extent_id: 0
+          - name: vessel_surface_identification
+            topic: 0E20H-1
+            id: 3616 # 0x0E20
+            extent_id: 1
+          - name: vessel_surface_name
+            topic: 0E20H-2
+            id: 3616 # 0x0E20
+            extent_id: 2
+          # - name: vessel_surface_measurement_lut
+          #   topic: 0E31H-1
+          #   id: 3633 # 0x0E31
+          #   extent_id: 1
+          #   target_type: 0 # surface
+      prefixes:
+        manual: [30001, 39999]
+        fused_surface: [0, 9999]
+        fused_underwater: [10001, 19999]
+        fused_aerial: [20001, 29999]
+  controller:
+    sources:
+      []
+      # - name: szo_controller
+      #   adapter: SzoExternalController
+usfs_common:
+  sensor_object_id_range:
+    special:
+      fused_surface: [65535, 99999]
+    vessel:
+      manual: [65535, 99999]
+      fused_surface: [0, 65534]
+      fused_underwater: [0, 65534]
+      fused_aerial: [0, 65534]
+    cluster:
+      manual: [30001, 39999]
+      fused_surface: [0, 9999]
+      fused_underwater: [10001, 19999]
+      fused_aerial: [20001, 29999]
+usfs_fusion:
+  adapter:
+    sources:
+      - name: szo_vessel_data_adapter
+        element: SzoVesselDataAdapter
+        sinks: ["szo_cluster_surface_fusion"]
+  application:
+    pipelines:
+      - name: szo_cluster_surface_fusion
+        element: SzoVesselFusionPipeline
+        plugin: ProbabilisticFusionPlugin
+        target_types: [0] # 0: surface, 1: underwater, 2: aerial
+        filters:
+          - name: passive_measurement_velocity_estimation
+            element: PassiveMeasurementVelocityEstimationFusionFilter
+            type: 0
+            params:
+              allowed_sensor_target_type: [0] # surface
+              allowed_sensor_type:
+                - 0 # nav_radar
+                - 1 # laser_radar
+                - 6 # pmtd
+              allow_active_sensor: true
+              allow_non_zero_velocity_measurement: true
+              use_measurement_history: true
+              history_size: 8
+              max_speed: 5.0
+          - name: measurement_velocity_convergence_estimation
+            element: MeasurementVelocityConvergenceEstimationFusionFilter
+            type: 0
+          - name: kalman_motion
+            element: KalmanMotionFusionFilter
+            type: 1
+          - name: history_attribute_determination
+            element: HistotyAttributeDeterminationFusionFilter
+            type: 4
+          - name: type_fusion
+            # element: MaximumTypeFusionFilter
+            element: SzoVotingTypeFusionFilter
+            type: 2
+          - name: motion_state_estimation
+            element: MotionStateEstimationFusionFilter
+            type: 5
+          - name: shape_based_motion_modification
+            element: ShapeBasedMotionModificationFusionFilter
+            type: 5
+            params:
+              debug_mode: false
+              max_velocity: 5.0
+              max_velocity_angle_diff: 360.0 # just not to check
+              max_location_distance: 10.0
+              update_velocity_on_line: true
+              update_motion_state_on_line: true
+              project_location_on_line: false
+              update_location_on_prediction: false
+              specific_types:
+                # UNKNOWN
+                - 0
+          - name: moving_target_velocity_smoothing
+            element: MovingTargetVelocitySmoothingFusionFilter
+            type: 5
+            params:
+              debug_mode: false
+              momentum: 0.5
+              velocity_history_size: 10
+              angle_threshold: 25.0
+              speed_threshold: 3.0 # m/s
+              cut_off_velocity_for_stationary_target: true
+          - name: trajectory_shape_estimation
+            element: TrajectoryShapeEstimationFusionFilter
+            type: 5
+            params:
+              debug_mode: false
+              history_size: 3
+              smooth_line_course: true
+          - name: free_move_trajectory_prediction
+            element: FreeMoveTrajectoryPredictionFusionFilter
+            type: 5
+          - name: shape_based_trajectory_prediction
+            element: ShapeBasedTrajectoryPredictionFusionFilter
+            type: 5
+          - name: naive_threat_estimation
+            element: NaiveThreatEstimationFusionFilter
+            type: 5
+            params:
+              # debug_mode: true
+              chosen_site_id: 3073
+              weight_type: 0.25
+              weight_course: 0.125
+              weight_speed: 0.125
+              weight_distance: 0.5
+  fusion_component:
+    prediction:
+      frequency:
+        cluster: 10
+        vessel: 10
+    cluster:
+      find_friend_vessels:
+        debug_mode: true
+        threshold: 50.0
+        quite_factor: 1.5
+        prev_marked_factor: 1.5
+      remove_friend_vessels:
+        enabled: false
+      remap_friend_vessels:
+        enabled: true
+        use_vessel_location: false
+        use_vessel_velocity: false
+      collect_vessel_statistics:
+        enabled: false
+    system:
+      debug_mode: false
+      update_motion_without_measurements: false
+      data_association_method: "GreedyTrackersObjectsAssociation"
+      max_lidar_invisible_period: 1.0 # 30.0
+      max_radar_invisible_period: 30.0 # 30.0
+      max_camera_invisible_period: 15.0 # 30.0
+      max_underwater_invisible_period: 2.0
+      min_num_objects_for_mature_underwater_track: 1
+      min_tracking_period_for_mature_track: 20.0
+      min_tracking_density_for_mature_track: 0.75
+      remove_duplicated_tracks:
+        remove_similiar_ctr_vel:
+          enabled: true
+          distance_threshold: 10.0
+          velocity_diff_threshold: 1.0
+          course_diff_threshold: 10.0
+      cluster_measurements:
+        enabled: false
+        threshold: 10.0
+      merge_measurements:
+        method:
+          find_circle: false
+          use_outlier_rejection: true
+      bearing_only_measurements:
+        debug_mode: false
+        enabled: true
+        min_vessel_number: 3
+        measurement_noise_stddev: 0.08726646259971647 # 5 degrees
+        min_likelihood: 0.5
+        min_mahalanobis_score: 0.5
+      remove_lost_tracks:
+        reserve_underwater:
+          stationary: false
+          moving:
+            enabled: true
+            tracking_period: 15.0
+          specific_types: []
+          mature_types: []
+          check_density_of_mature_tracks: false
+      reactivate_lost_tracks:
+        enabled: true
+        reactivate_near:
+          enabled: true
+        reactivate_on_line:
+          enabled: true
+      collect_original_measurements:
+        collect_direct_measurements: true
+        collect_inner_measurements: true
+        # recent_duration: 2.0
+      object_filters:
+        - name: szo_friend_vessel_operation
+          element: SzoFriendVesselOperationFusionObjectFilter
+          type: 0
+        - name: fused_object_metric_evaluation
+          element: FusedObjectMetricEvaluationFusionObjectFilter
+          type: 0
+          params:
+            debug_mode: true
+            output_dir: /tmp
+            use_fair_center_distance: true
+            check_object_timestamp: false
+            arriving_timestamp_threshold: 2.0
+            surface_moving_target_site_ids:
+              - "24574"
+              - "24575"
+              - "24576"
+              - "24577"
+            underwater_moving_target_site_ids: []
+            underwater_stationary: []
+            positive_distance_threshold: 20.00
+            negative_distance_threshold: 20.01
+            positive_speed_error_threshold: 10.00
+            negative_speed_error_threshold: 10.01
+            positive_course_error_threshold: 360.0
+            negative_course_error_threshold: 361.0
+            max_center_distance_threshold: 100.0
+            print_best_meas_statistics: true
+            threat_evaluation_site_ids:
+              - "3073"
+        - name: empty_measurement_rejection
+          element: EmptyMeasurementRejectionFusionObjectFilter
+          type: 0
+      sort_fused_objects:
+        enabled: true
+        key: 1 # threat
+        ascending: false
+    tracker:
+      motion_fusion:
+        debug_mode: false
+        use_last_fusion_time_for_time_diff: false
+        extrapolation:
+          need_alive: false
+          need_moving: true
+          need_mature: true
+          need_dense: false
+          need_trajectory_type:
+            all: false
+            line: true
+            circle: false
+    matcher:
+      debug_mode: false
+      match_distance_thresh: 10.0
+      match_distance_bound: 35.0
+      match_threshold_by_relative_distance:
+        # Each element is a tuple of
+        # [min_relative_distance, max_relative_distance, match_distance_thresh,
+        # match_distance_bound].
+        - [0.0, 200.0, 10.0, 15.0]
+      match_threshold_scale_by_sensor:
+        - sensor_name: "nav_radar"
+          # Each element is a tuple of [match_distance_thresh_scale,
+          # match_distance_bound_scale].
+          scale: [1.0, 2.0]
+      id_assign:
+        consistent_id_for_adjacent_measurements:
+          enabled: false
+          threshold: 10.0
+          time_diff: 5.0
+      distance_matrix:
+        compute_2d_center_distance: true
+        similar_velocity:
+          enabled: true
+          course_threshold: 30.0
+    gatekeeper:
+      debug_mode: false
+      check_invisible_period:
+        enabled: false
+      check_empty_measurements:
+        enabled: false
+      check_tracked_period:
+        enabled: true
+        threshold:
+          surface: 1.0
+          underwater_active: -1.0
+          underwater_passive: 3.0
+      check_geo_fence:
+        enabled: false
+        vertices:
+          # scanning for mines (simulation)
+          - lon: 111.645249
+            lat: 32.776734
+          - lon: 111.634654
+            lat: 32.77221
+          - lon: 111.645249
+            lat: 32.77221
+          - lon: 111.634654
+            lat: 32.776737
+  sensor_component:
+    filters:
+      - name: szo_camera_measurement_modification
+        element: SzoCameraMeasurementModification
+        params:
+          debug_mode: false
+          max_angle_diff: 10.0
+          max_distance: 1000.0
+          site_id_to_calculate_angle: 3073
+      - name: szo_sensor_measurement_rejection
+        element: SzoSensorMeasurementRejection
+        params:
+          debug_mode: false
+          rules:
+            # reject measurements far from the site
+            - site_id: 3073
+              distance_threshold: 200.0
+            # reject measurements within the sector region
+            - site_id: 3073
+              min_distance: 0.0
+              max_distance: 50.0
+              start_angle: 165.0
+              end_angle: 195.0
+            # - site_id: 3073
+            #   allowed_measurement_ids:
+            #     [62, 92, 244, 497, 512, 569, 600, 601, 628]
+    uncertainty:
+      dist_rms: [30.0, 30.0]
+      vel_rms: [5.0, 5.0]
+      increase_rms_if_high_vel: false
+      sensors:
+        - sensor_name: "laser_radar"
+          dist_rms: [10.0, 10.0]
+  visualization_component:
+    path:
+      allowed_fused_ids: [0, 1, 2, 3, 5, 6, 7, 8, 9]
+      # allowed_observation_ids: [308, 1086, 1646]
+    additional_subscribers:
+      driver:
+        - "nav_radar"
+        - "ais_moving_target"
+        - "pmtd"
+        - "servo"
+        - "laser_radar"
+        - "vision_result"
+        - "single_vessel"
+        - "single_vessel_surface"
+        - "cluster_surface"
+        - "ground_truth_surface"
+        - "vessel_site_info"
+    additional_publishers:
+      - "fused"
+      - "nav_radar"
+      - "ais_moving_target"
+      - "pmtd"
+      - "servo"
+      - "laser_radar"
+      - "vision_result"
+      - "single_vessel"
+      - "single_vessel_surface"
+      - "cluster_surface"
+      - "ground_truth_surface"
+      - "vessel_site_info"
+      - "geo_fence"
+    marker_namespaces:
+      - "sphere" # point
+      - "path"
+      - "id"
+      - "attr"
+      - "source"
+      - "trajectory"
+      - "visual_attr"
+      - "arrow" # velocity
+      - "bearing"
+      - "shape"
+usfs_prediction:
+  predictor:
+    # max_history_time: 30.0
+    check_id_range: false
+    use_associated_obstacle_ids: false
+    state:
+      debug_mode: false
+      still_threshold:
+        unknown:
+          position_std: 5.0
+          speed_threshold: 0.514 # 1knots
+    shape:
+      parse_tag_as_trajectory_shape:
+        enabled: false
+      disabled_checkers:
+        circle: true
+      check_target_maneuvering:
+        enabled: true
+        max_angle_diff: 15.0
+        history_size: 16

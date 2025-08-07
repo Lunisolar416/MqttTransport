@@ -39,7 +39,7 @@ int main(int argc, char **argv)
     std::vector<std::string> topics;
     loadconfig(topics);
 
-    MqttTransport sub("tcp://192.1.1.8:1883", "tcp://192.1.1.46:2883", "sub_brige_client", "pub_brige_client");
+    MqttTransport sub("tcp://192.1.18.8:1883", "tcp://192.1.18.8:1883", "sub_brige_client", "pub_brige_client");
     sub.connect();
     topics.insert(topics.end(), {"0041", "0121", "0151", "0152", "0411", "0A11"});
 

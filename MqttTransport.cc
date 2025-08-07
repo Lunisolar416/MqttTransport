@@ -297,6 +297,7 @@ void MqttTransport::heartbeatsLoop()
 // 导航雷达
 void MqttTransport::handle_0111(const nlohmann::json &json_msg, const std::string &topic)
 {
+
     sensor_last_recv_time_[COMPONENT_0111] = std::chrono::steady_clock::now();
     try
     {
@@ -316,14 +317,14 @@ void MqttTransport::handle_0111(const nlohmann::json &json_msg, const std::strin
         // ========== content[0] ==========
         nlohmann::json unit;
 
-        unit["infoUnitHead"] = {{"destPlatformId", head_in.value("destPlatformId", 0)},
+        unit["infoUnitHead"] = {{"destPlatformId", 1793},
                                 {"infoSourceTypeId", 0},
                                 {"infoUnitCreateTime", getCurrentTimeString().substr(11)}, // "HH:MM:SS.xxx"
                                 {"infoUnitExtentId", 0},
-                                {"infoUnitID", 0},
+                                {"infoUnitID", 0x03},
                                 {"infoUnitLength", 0},
-                                {"secondInfoUnitId", head_in.value("secondPlatformId", 0)},
-                                {"sourcePlatformId", head_in.value("sourcePlatformId", 0)}};
+                                {"secondInfoUnitId", 3619},
+                                {"sourcePlatformId", 3073}};
 
         nlohmann::json content_out;
         content_out["targetNumber"] = content_in.value("count", 0);
@@ -354,7 +355,7 @@ void MqttTransport::handle_0111(const nlohmann::json &json_msg, const std::strin
             tgt["targetRelativeDirection"] = 0;
             tgt["targetRelativeSpeed"] = 0;
             tgt["targetSimulateSign"] = 0;
-            tgt["targetSourcePlatformId"] = 0;
+            tgt["targetSourcePlatformId"] = 3073;
             tgt["targetTcpa"] = 0;
             tgt["trackQualityNumber"] = 0;
 
@@ -365,8 +366,8 @@ void MqttTransport::handle_0111(const nlohmann::json &json_msg, const std::strin
         output["content"] = nlohmann::json::array({unit});
 
         publish("0E23H-0", output);
-        mqtt::message_ptr msg = mqtt::make_message("0E23H-0", output.dump());
-        pubOr_client_.publish(msg, nullptr, *this);
+        // mqtt::message_ptr msg = mqtt::make_message("0E23H-0", output.dump());
+        // pubOr_client_.publish(msg, nullptr, *this);
     }
     catch (const std::exception &e)
     {
@@ -412,14 +413,14 @@ void MqttTransport::handle_0421(const nlohmann::json &json_msg, const std::strin
 
         // 构造 infoUnitHead（固定值或零）
         nlohmann::json infoUnitHead;
-        infoUnitHead["destPlatformId"] = 0;
-        infoUnitHead["sourcePlatformId"] = 0;
-        infoUnitHead["infoUnitCreateTime"] = ""; // eg. "11:31:36.300"
-        infoUnitHead["infoUnitExtentId"] = 0;
-        infoUnitHead["infoUnitID"] = 0;
+        infoUnitHead["destPlatformId"] = 1739;
+        infoUnitHead["sourcePlatformId"] = 3073;
+        infoUnitHead["infoUnitCreateTime"] = getCurrentTimeString().substr(11); // eg. "11:31:36.300"
+        infoUnitHead["infoUnitExtentId"] = 1;
+        infoUnitHead["infoUnitID"] = 0x03;
         infoUnitHead["infoUnitLength"] = 0;
-        infoUnitHead["secondInfoUnitId"] = 0;
-        infoUnitHead["infoSourceTypeId"] = 0;
+        infoUnitHead["secondInfoUnitId"] = 3632;
+        infoUnitHead["infoSourceTypeId"] = 3073;
 
         unit["infoUnitHead"] = infoUnitHead;
 
@@ -475,7 +476,7 @@ void MqttTransport::handle_0131(const nlohmann::json &json_msg, const std::strin
             target["targetCreateTime"] = 0;
             target["targetRelativeSpeed"] = 0;
             target["targetSimulateSign"] = 0;
-            target["targetSourcePlatformId"] = 0;
+            target["targetSourcePlatformId"] = 3073;
             target["targetHeight"] = 0;
             target["coordinateSystemTaype"] = 0;
 
@@ -486,10 +487,10 @@ void MqttTransport::handle_0131(const nlohmann::json &json_msg, const std::strin
 
         // infoUnitHead 置零
         info_unit["infoUnitHead"] = {
-            {"infoUnitID", 0},       {"secondInfoUnitId", 0},
-            {"sourcePlatformId", 0}, {"destPlatformId", 0},
-            {"infoUnitLength", 0},   {"infoUnitExtentId", 0},
-            {"infoSourceTypeId", 0}, {"infoUnitCreateTime", getCurrentTimeString().substr(11)} // 仅保留 HH:mm:ss.sss
+            {"infoUnitID", 0x03},       {"secondInfoUnitId", 3621},
+            {"sourcePlatformId", 3073}, {"destPlatformId", 1793},
+            {"infoUnitLength", 0},      {"infoUnitExtentId", 2},
+            {"infoSourceTypeId", 0},    {"infoUnitCreateTime", getCurrentTimeString().substr(11)} // 仅保留 HH:mm:ss.sss
         };
 
         output["content"] = nlohmann::json::array({info_unit});
@@ -513,57 +514,6 @@ void MqttTransport::handle_0121(const nlohmann::json &json_msg, const std::strin
     // std::cout<<"[0121] "<<json_msg.dump()<<std::endl;
     try
     {
-        /*
-        nlohmann::json output;
-        // head
-        const auto& head_in = json_msg.at("head");
-        output["head"] = {{"packageSerialNumber", head_in.value("packageSeq", 0)},
-                          {"packageId", 0},
-                          {"packageConfirmNumber", 0},
-                          {"sendIP", ""},
-                          {"destIP", ""}};
-        nlohmann::json info_unit;
-        nlohmann::json content_out;
-        const auto& content_in = json_msg.at("content");
-
-        info_unit["infoUnitHead"] = {{"infoUnitID", 0},
-                                     {"infoUnitLength", 0},
-                                     {"infoUnitCreateTime", getCurrentTimeString().substr(11)},
-                                     {"sourcePlatformId", 0},
-                                     {"secondInfoUnitId", 0},
-                                     {"destPlatformId", 0},
-                                     {"infoSourceTypeId", 0},
-                                     {"infoUnitExtentId", 0}};
-        // 构造 infoUnitContent
-        nlohmann::json info_content;
-        info_content["platformStatusYaw"] = 0.0;
-        info_content["targetNumber"] = 1;
-        // 构造目标
-        nlohmann::json target;
-        target["targetSourcePlatformId"] = 0;
-        target["targetSource"] = content_in.value("source", 0);
-        target["targetId"] = content_in.value("batch", 0);
-        target["targetIFFSign"] = content_in.value("sign", 255);
-        target["targetIFFConfidenceDegree"] = content_in.value("confidence", 0);
-        target["targetMilitaryCivilianSign"] = 0;
-        target["targetType"] = content_in.value("type", 0);
-        target["targetTypeConfidenceDegree"] = 0;
-
-        // 边框位置字段（用 pitch, orientation, height 近似替代）
-        target["targetBoxULXAxisCoordinata"] = 0;
-        target["targetBoxULYAxisCoordinata"] = 0;
-        target["targetBoxWidth"] = 0;
-        target["targetBoxLength"] = 0;
-
-        info_content["targets"] = nlohmann::json::array({target});
-        info_unit["infoUnitContent"] = info_content;
-
-        output["content"] = nlohmann::json::array({info_unit});
-
-        //std::cout << "[0121 Output]:\n" << output.dump(4) << std::endl;
-
-        publish("0E24H-1", output);
-        */
         TargetRecognition targetRec_;
         const auto &content = json_msg.at("content");
         targetRec_.batch = content.value("batch", 0.0);
@@ -638,14 +588,14 @@ void MqttTransport::handle_0A11(const nlohmann::json &json_msg, const std::strin
 
         // infoUnitHead
         nlohmann::json infoUnitHead;
-        infoUnitHead["sourcePlatformId"] = 0;
+        infoUnitHead["sourcePlatformId"] = 3073;
         infoUnitHead["destPlatformId"] = 0;
-        infoUnitHead["infoSourceTypeId"] = 0;
+        infoUnitHead["infoSourceTypeId"] = 3073;
         infoUnitHead["infoUnitExtentId"] = 0;
-        infoUnitHead["infoUnitID"] = 0;
+        infoUnitHead["infoUnitID"] = 0x03;
         infoUnitHead["secondInfoUnitId"] = 0;
         infoUnitHead["infoUnitLength"] = 0;
-        infoUnitHead["infoUnitCreateTime"] = getCurrentTimeString();
+        infoUnitHead["infoUnitCreateTime"] = getCurrentTimeString().substr(11);
 
         unit["infoUnitContent"] = infoUnitContent;
         unit["infoUnitHead"] = infoUnitHead;
@@ -690,7 +640,6 @@ void MqttTransport::handle_0411(const nlohmann::json &json_msg, const std::strin
         infoUnitContent["headingAngle"] = content.value("heading", 0.0);
         self_heading_ = infoUnitContent["headingAngle"];
         std::cout << "self heading " << self_heading_ << std::endl;
-        infoUnitContent["headingAngleAcceleration"] = content.value("headingAcc", 0.0);
         infoUnitContent["eastSpeed"] = content.value("eastSpeed", 0.0);
         infoUnitContent["northSpeed"] = content.value("northSpeed", 0.0);
         infoUnitContent["heavingSpeed"] = content.value("verticalSpeed", 0.0);
@@ -702,18 +651,17 @@ void MqttTransport::handle_0411(const nlohmann::json &json_msg, const std::strin
         infoUnitContent["accelerationX"] = content.value("accX", 0.0);
         infoUnitContent["accelerationY"] = content.value("accY", 0.0);
         infoUnitContent["accelerationZ"] = content.value("accZ", 0.0);
-        infoUnitContent["cruiseMode"] = content.value("deviceState", 0);
 
         // infoUnitHead
         nlohmann::json infoUnitHead;
-        infoUnitHead["sourcePlatformId"] = 0;
-        infoUnitHead["destPlatformId"] = 0;
+        infoUnitHead["sourcePlatformId"] = 3073;
+        infoUnitHead["destPlatformId"] = 1793;
         infoUnitHead["infoSourceTypeId"] = 0;
-        infoUnitHead["infoUnitExtentId"] = 0;
-        infoUnitHead["infoUnitID"] = 0;
-        infoUnitHead["secondInfoUnitId"] = 0;
+        infoUnitHead["infoUnitExtentId"] = 3;
+        infoUnitHead["infoUnitID"] = 0x03;
+        infoUnitHead["secondInfoUnitId"] = 3741;
         infoUnitHead["infoUnitLength"] = 0;
-        infoUnitHead["infoUnitCreateTime"] = getCurrentTimeString();
+        infoUnitHead["infoUnitCreateTime"] = getCurrentTimeString().substr(11);
 
         unit["infoUnitContent"] = infoUnitContent;
         unit["infoUnitHead"] = infoUnitHead;
@@ -762,9 +710,9 @@ void MqttTransport::handle_0152(const nlohmann::json &json_msg, const std::strin
 
 void MqttTransport::handle_0E20H0(const nlohmann::json &json_msg, const std::string &topic)
 {
-    // std::cout << "[0E20H-0 ]" << json_msg.dump(4) << std::endl;
-    mqtt::message_ptr msg = mqtt::make_message("0E20H-0", json_msg.dump());
-    pubOr_client_.publish(msg, nullptr, *this);
+    std::cout << "[0E20H-0 ]" << json_msg.dump(4) << std::endl;
+    // mqtt::message_ptr msg = mqtt::make_message("0E20H-0", json_msg.dump());
+    // pubOr_client_.publish(msg, nullptr, *this);
     try
     {
         if (!json_msg.contains("content") || !json_msg["content"].is_array() || json_msg["content"].empty())
@@ -795,9 +743,10 @@ void MqttTransport::handle_0E20H0(const nlohmann::json &json_msg, const std::str
             cache.has0 = true;
             cache.last_update = std::chrono::steady_clock::now();
         }
+        std::cout << "try merge" << std::endl;
         tryMerge();
     }
-    catch (const std::exception &e)
+    catch (const nlohmann::json::type_error &e)
     {
         std::cerr << "[0E20H-0] Exception: " << e.what() << std::endl;
     }
@@ -805,8 +754,8 @@ void MqttTransport::handle_0E20H0(const nlohmann::json &json_msg, const std::str
 
 void MqttTransport::handle_0E20H1(const nlohmann::json &json_msg, const std::string &topic)
 {
-    mqtt::message_ptr msg = mqtt::make_message("0E20H-1", json_msg.dump());
-    pubOr_client_.publish(msg, nullptr, *this);
+    // mqtt::message_ptr msg = mqtt::make_message("0E20H-1", json_msg.dump());
+    // pubOr_client_.publish(msg, nullptr, *this);
     try
     {
         if (!json_msg.contains("content") || !json_msg["content"].is_array() || json_msg["content"].empty())
@@ -838,7 +787,7 @@ void MqttTransport::handle_0E20H1(const nlohmann::json &json_msg, const std::str
         }
         tryMerge();
     }
-    catch (const std::exception &e)
+    catch (const nlohmann::json::type_error &e)
     {
         std::cerr << "[0E20H-1] Exception: " << e.what() << std::endl;
     }
@@ -846,8 +795,8 @@ void MqttTransport::handle_0E20H1(const nlohmann::json &json_msg, const std::str
 
 void MqttTransport::handle_0E20H2(const nlohmann::json &json_msg, const std::string &topic)
 {
-    mqtt::message_ptr msg = mqtt::make_message("0E20H-2", json_msg.dump());
-    pubOr_client_.publish(msg, nullptr, *this);
+    // mqtt::message_ptr msg = mqtt::make_message("0E20H-2", json_msg.dump());
+    // pubOr_client_.publish(msg, nullptr, *this);
     try
     {
         if (!json_msg.contains("content") || !json_msg["content"].is_array() || json_msg["content"].empty())
@@ -879,7 +828,7 @@ void MqttTransport::handle_0E20H2(const nlohmann::json &json_msg, const std::str
         }
         tryMerge();
     }
-    catch (const std::exception &e)
+    catch (const nlohmann::json::type_error &e)
     {
         std::cerr << "[0E20H-2] Exception: " << e.what() << std::endl;
     }
@@ -1093,14 +1042,23 @@ void MqttTransport::mergeAndOutput(const std::vector<int> &targetIds)
 
         double relAzimuth = GeoUtils::computeRelBearing(absAzimuth, self_heading_);
         // std::cout<<" [relAzimuth]"<<relAzimuth<<std::endl;
+        /*tgt["distance"] = distance;*/
+        tgt["absAzimuth"] = absAzimuth;
+        tgt["relAzimuth"] = relAzimuth;
 
         tgt["distance"] = t0.value("targetDistance", 0.0);
-        tgt["absAzimuth"] = t0.value("targetAbsoluteDirection", 0.0);
-        tgt["relAzimuth"] = t0.value("targetRelativeDirection", 0.0);
-        tgt["sign"] = t0.value("targetSimulateSign", 0);
-        tgt["shipLength"] = t0.value("targetEdgeLength", 0.0);
-        tgt["shipWidth"] = t0.value("targetEdgeWidth", 0.0);
-        tgt["shipHeight"] = t0.value("targetHeight", 0.0);
+        // tgt["absAzimuth"] = t0.value("targetAbsoluteDirection", 0.0);
+        // tgt["relAzimuth"] = t0.value("targetRelativeDirection", 0.0);
+
+        int sign = t1.value("targetIFFSign", 0);
+        if (sign == 6)
+            sign == 65535;
+        if (sign == 3)
+            sign == 0;
+        tgt["sign"] = sign;
+        // tgt["shipLength"] = t0.value("targetEdgeLength", 0.0);
+        // tgt["shipWidth"] = t0.value("targetEdgeWidth", 0.0);
+        // tgt["shipHeight"] = t0.value("targetHeight", 0.0);
         tgt["type"] = t1.value("targetType", 0);
         tgt["color"] = 0;
         tgt["state"] = t1.value("targetStatus", 0);
