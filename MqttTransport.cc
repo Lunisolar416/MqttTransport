@@ -1050,8 +1050,9 @@ void MqttTransport::mergeAndOutput(const std::vector<int> &targetIds)
         tgt["relAzimuth"] = relAzimuth;
 
         tgt["distance"] = t0.value("targetDistance", 0.0);
-        // tgt["absAzimuth"] = t0.value("targetAbsoluteDirection", 0.0);
-        // tgt["relAzimuth"] = t0.value("targetRelativeDirection", 0.0);
+        // 存疑
+        //  tgt["absAzimuth"] = t0.value("targetDirection", 0.0);
+        //  tgt["relAzimuth"] = t0.value("targetRelativeDirection", 0.0);
 
         int sign = t1.value("targetIFFSign", 0);
         if (sign == 6)
@@ -1210,7 +1211,7 @@ void MqttTransport::cleanupExpiredCaches()
     auto now = steady_clock::now();
     for (auto it = target_cache.begin(); it != target_cache.end();)
     {
-        if (duration_cast<seconds>(now - it->second.last_update).count() > 20) // 超过30秒没更新
+        if (duration_cast<seconds>(now - it->second.last_update).count() > 30) // 超过30秒没更新
         {
             it = target_cache.erase(it);
         }
