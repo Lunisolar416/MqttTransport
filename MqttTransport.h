@@ -11,6 +11,7 @@
 #include <mqtt/connect_options.h>
 #include <mqtt/token.h>
 #include <nlohmann/json.hpp>
+#include <sys/types.h>
 #include <unordered_map>
 #include <unordered_set>
 // 处理融合结果
@@ -24,7 +25,6 @@ struct TargetCache
     bool has1 = false;
     bool has2 = false;
 };
-
 struct ClusterTargetCache
 {
     nlohmann::json part0;
@@ -36,6 +36,20 @@ struct ClusterTargetCache
     bool has2 = false;
 };
 
+struct Point
+{
+    double lat; // 纬度
+    double lon; // 经度
+    Point(double lat, double lon) : lat(lat), lon(lon)
+    {
+    }
+};
+struct Area
+{
+    int areasFuncId;
+    int polygonNumber;
+    std::vector<Point> polygon;
+};
 // 这个类就作为订阅者和发布者
 // 订阅外部消息，再该类中转化成新的协议并发到usfs的brige的mqttsubscriber中
 class MqttTransport : public virtual mqtt::callback, public virtual mqtt::iaction_listener
@@ -60,6 +74,8 @@ class MqttTransport : public virtual mqtt::callback, public virtual mqtt::iactio
     // 处理接收到的消息
     // 接受0041协议也就是水域类型上报协议，确定水域类型
     void handle_0041(const nlohmann::json &json_msg, const std::string &topic);
+    // 区域过滤
+    void handle_0042(const nlohmann::json &json_msg, const std::string &topic);
     // 接受0051协议也就是组件状态协议，并以1HZ上报自身状态
     void handle_0051();
     void heartbeatsLoop();
@@ -112,6 +128,11 @@ class MqttTransport : public virtual mqtt::callback, public virtual mqtt::iactio
 
     // distance
 
+    // position
+    bool isPointInPolygonXY(double x, double y, const std::vector<std::pair<double, double>> &polygonXY);
+    bool isPointInPolygonGeo(const Point &pt, const std::vector<Point> &polygon);
+    bool isInArea(const Point &pt);
+
   private:
     // subscribe to receive outenv data
     mqtt::client client_;             // subscribe client
@@ -148,11 +169,17 @@ class MqttTransport : public virtual mqtt::callback, public virtual mqtt::iactio
     std::unordered_map<uint16_t, std::chrono::steady_clock::time_point> sensor_last_recv_time_;
 
     // Longitude
-    float self_longitude_;
+    double self_longitude_;
     // Latitude
-    float self_latitude_;
+    double self_latitude_;
     // heading
     double self_heading_;
+
+    // Course
+    std::unordered_map<uint16_t, double> courses_;
+
+    // position
+    std::unordered_map<int, Area> areaMap;
 };
 
 #endif // MQTTSUBSCRIBER_H

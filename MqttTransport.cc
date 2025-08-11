@@ -1,5 +1,6 @@
 #include "MqttTransport.h"
 #include "protocal.h"
+#include <GeographicLib/LocalCartesian.hpp>
 #include <exception>
 #include <fstream>
 #include <functional>
@@ -140,7 +141,8 @@ void MqttTransport::loadConfig()
         std::bind(&MqttTransport::handle_0411, this, std::placeholders::_1, std::placeholders::_2);
     topic_handlers_["0A11"] =
         std::bind(&MqttTransport::handle_0A11, this, std::placeholders::_1, std::placeholders::_2);
-
+    topic_handlers_["0042"] =
+        std::bind(&MqttTransport::handle_0042, this, std::placeholders::_1, std::placeholders::_2);
     if (driver_topics)
     {
         for (const auto &item : driver_topics)
@@ -249,6 +251,53 @@ void MqttTransport::handle_0041(const nlohmann::json &json_msg, const std::strin
     else
         is_simple_waterarea = false;
 }
+// 0042 区域过滤
+void MqttTransport::handle_0042(const nlohmann::json &json_msg, const std::string &topic)
+{
+    if (!json_msg.is_array() || json_msg.empty())
+    {
+        std::cerr << "handle_0042: json_msg is not array or empty\n";
+        return;
+    }
+
+    const auto &area_obj = json_msg[0];
+    if (!area_obj.contains("areasFuncId") || !area_obj.contains("polygonNumber") || !area_obj.contains("polygon"))
+    {
+        std::cerr << "handle_0042: missing required fields\n";
+        return;
+    }
+
+    Area area;
+    area.areasFuncId = area_obj["areasFuncId"].get<int>();
+    area.polygonNumber = area_obj["polygonNumber"].get<int>();
+    area.polygon.clear();
+
+    const auto &polygon_json = area_obj["polygon"];
+    if (!polygon_json.is_array())
+    {
+        std::cerr << "handle_0042: polygon field not array\n";
+        return;
+    }
+
+    for (const auto &pt_json : polygon_json)
+    {
+        if (pt_json.contains("areaPointsLatitude") && pt_json.contains("areaPointsLongitude"))
+        {
+            double lat = pt_json["areaPointsLatitude"].get<double>();
+            double lon = pt_json["areaPointsLongitude"].get<double>();
+            area.polygon.push_back({lat, lon});
+        }
+    }
+
+    if (static_cast<int>(area.polygon.size()) != area.polygonNumber)
+        std::cerr << "handle_0042: Warning polygonNumber mismatch\n";
+
+    areaMap[area.areasFuncId] = area;
+
+    // std::cout << "handle_0042: updated areaMap with ID=" << area.areasFuncId << ", polygon points=" <<
+    // area.polygon.size() << "\n";
+}
+
 // 组件协议
 void MqttTransport::handle_0051()
 {
@@ -297,7 +346,6 @@ void MqttTransport::heartbeatsLoop()
 // 导航雷达
 void MqttTransport::handle_0111(const nlohmann::json &json_msg, const std::string &topic)
 {
-
     sensor_last_recv_time_[COMPONENT_0111] = std::chrono::steady_clock::now();
     try
     {
@@ -465,6 +513,10 @@ void MqttTransport::handle_0131(const nlohmann::json &json_msg, const std::strin
             target["targetDistance"] = t.value("distance", 0.0);
             target["targetAbsoluteSpeed"] = t.value("absSpeed", 0.0);
             target["targetDirection"] = t.value("absCourse", 0.0);
+
+            // 存储航向
+            courses_[target["targetId"]] = target["targetDirection"];
+
             target["targetRelativeDirection"] = t.value("heading", 0.0);
             target["targetLatitude"] = t.value("latitude", 0.0);
             target["targetLongitude"] = t.value("longitude", 0.0);
@@ -496,12 +548,12 @@ void MqttTransport::handle_0131(const nlohmann::json &json_msg, const std::strin
         output["content"] = nlohmann::json::array({info_unit});
 
         // 如果是开阔水域将不再上报激光雷达信息
-        // if (is_simple_waterarea == false)
-        // {
-        //     publish("0E25H-2", output);
-        // }
+        if (is_simple_waterarea == false)
+        {
+            publish("0E25H-2", output);
+        }
 
-        publish("0E25H-2", output);
+        // publish("0E25H-2", output);
     }
     catch (const std::exception &e)
     {
@@ -1031,12 +1083,23 @@ void MqttTransport::mergeAndOutput(const std::vector<int> &targetIds)
         nlohmann::json tgt;
         tgt["batch"] = id;
         tgt["absSpeed"] = t0.value("targetAbsoluteSpeed", 0.0);
-        tgt["absCourse"] = t0.value("targetAbsoluteDirection", 0.0);
+
+        auto cit = courses_.find(id);
+        tgt["absCourse"] = (cit != courses_.end()) ? cit->second : t0.value("targetAbsoluteDirection", 0.0);
+
         tgt["heading"] = t0.value("targetRelativeDirection", 0.0);
         tgt["longitude"] = t0.value("targetLongitude", 0.0);
         tgt["latitude"] = t0.value("targetLatitude", 0.0);
         double longitude = tgt["longitude"];
         double latitude = tgt["latitude"];
+
+        Point point(latitude, longitude);
+        if (!isInArea(point))
+        {
+            std::cout << "out of range" << std::endl;
+            continue;
+        }
+
         double distance = GeoUtils::computeDistance(self_longitude_, self_latitude_, longitude, latitude);
         // std::cout << "距离: " << distance << " 米" << std::endl;
 
@@ -1063,17 +1126,30 @@ void MqttTransport::mergeAndOutput(const std::vector<int> &targetIds)
         // tgt["shipLength"] = t0.value("targetEdgeLength", 0.0);
         // tgt["shipWidth"] = t0.value("targetEdgeWidth", 0.0);
         // tgt["shipHeight"] = t0.value("targetHeight", 0.0);
-        tgt["type"] = t1.value("targetType", 0);
+        uint8_t type = t1.value("targetType", 0);
+        if (type == 4 || type == 5 || type == 6 || type == 7 || type == 8 || type == 9 || type == 10 || type == 11)
+            type = 1;
+        tgt["type"] = type;
         tgt["color"] = 0;
         tgt["state"] = t1.value("targetStatus", 0);
         tgt["threatingRadius"] = t1.value("targetThreatingRadius", 0.0);
 
-        tgt["code"] = t2.value("targetPennantNumber", "");
+        tgt["code"] = "0";
+        // tgt["code"] = t2.value("targetPennantNumber", "");
         tgt["model"] = t2.value("targetShipType", 0);
         tgt["name"] = t2.value("targetName", "");
 
         tgt["MMSI"] = 0;
-        tgt["source"] = t0.value("trackQualityNumber", 0.0);
+
+        auto source = t0.value("trackQualityNumber", 0);
+        std::cout << "source " << source << std::endl;
+
+        if (source == (1 << 9))       // bit9 virtual target
+            source = 1 << 3;          // bit3
+        else if (source == (1 << 10)) // bit10 ais
+            source = 1 << 2;          // bit2
+
+        tgt["source"] = source;
 
         // 0121
         auto rec_it = target_recongnition_.find(id);
@@ -1211,7 +1287,7 @@ void MqttTransport::cleanupExpiredCaches()
     auto now = steady_clock::now();
     for (auto it = target_cache.begin(); it != target_cache.end();)
     {
-        if (duration_cast<seconds>(now - it->second.last_update).count() > 30) // 超过30秒没更新
+        if (duration_cast<seconds>(now - it->second.last_update).count() > 40) // 超过30秒没更新
         {
             it = target_cache.erase(it);
         }
@@ -1443,4 +1519,55 @@ void MqttTransport::cleanupExpiredClusterCaches()
             ++it;
         }
     }
+}
+
+bool MqttTransport::isPointInPolygonXY(double x, double y, const std::vector<std::pair<double, double>> &polygonXY)
+{
+    bool inside = false;
+    int n = polygonXY.size();
+    for (int i = 0, j = n - 1; i < n; j = i++)
+    {
+        double xi = polygonXY[i].first, yi = polygonXY[i].second;
+        double xj = polygonXY[j].first, yj = polygonXY[j].second;
+
+        bool intersect = ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+        if (intersect)
+            inside = !inside;
+    }
+    return inside;
+}
+
+bool MqttTransport::isPointInPolygonGeo(const Point &pt, const std::vector<Point> &polygon)
+{
+    // 以多边形第一个点为参考原点
+    GeographicLib::LocalCartesian proj(polygon[0].lat, polygon[0].lon, 0);
+
+    // 将多边形点转为局部平面坐标
+    std::vector<std::pair<double, double>> polyXY;
+    for (const auto &p : polygon)
+    {
+        double x, y, z;
+        proj.Forward(p.lat, p.lon, 0, x, y, z);
+        polyXY.emplace_back(x, y);
+    }
+
+    double px, py, pz;
+    proj.Forward(pt.lat, pt.lon, 0, px, py, pz);
+
+    return isPointInPolygonXY(px, py, polyXY);
+}
+
+bool MqttTransport::isInArea(const Point &pt)
+{
+    for (const auto &[id, area] : areaMap)
+    {
+        if (area.polygon.empty())
+            continue;
+        if (isPointInPolygonGeo(pt, area.polygon))
+        {
+            std::cout << "[isInArea] point in area: " << id << std::endl;
+            return true;
+        }
+    }
+    return false;
 }
