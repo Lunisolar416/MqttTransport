@@ -1,5 +1,5 @@
 #include "MqttTransport.h"
-#include <yaml-cpp/yaml.h>
+#include "protocal.h"
 #include <GeographicLib/LocalCartesian.hpp>
 #include <exception>
 #include <fstream>
@@ -7,14 +7,11 @@
 #include <iomanip>
 #include <iostream>
 #include <utility>
-#include "protocal.h"
-MqttTransport::MqttTransport(const std::string& subclientaddress,
-                             const std::string& pubclientaddress, const std::string& subclient_id,
-                             const std::string pubclient_id)
-    : client_(subclientaddress, subclient_id),
-      pub_client_(pubclientaddress, pubclient_id),
-      sub_client_(pubclientaddress, "result"),
-      pubR_client_(subclientaddress, "sendRes"),
+#include <yaml-cpp/yaml.h>
+MqttTransport::MqttTransport(const std::string &subclientaddress, const std::string &pubclientaddress,
+                             const std::string &subclient_id, const std::string pubclient_id)
+    : client_(subclientaddress, subclient_id), pub_client_(pubclientaddress, pubclient_id),
+      sub_client_(pubclientaddress, "result"), pubR_client_(subclientaddress, "sendRes"),
       pubOr_client_(subclientaddress, "sendOres")
 {
     loadConfig();
@@ -39,7 +36,7 @@ MqttTransport::~MqttTransport()
         pubR_client_.disconnect();
         pubOr_client_.disconnect();
     }
-    catch (const mqtt::exception& e)
+    catch (const mqtt::exception &e)
     {
         std::cerr << "Disconnection failed: " << e.what() << std::endl;
     }
@@ -56,26 +53,25 @@ bool MqttTransport::connect()
         pubOr_client_.connect(conn_opts_);
         return true;
     }
-    catch (const mqtt::exception& e)
+    catch (const mqtt::exception &e)
     {
         std::cerr << "Connection failed: " << e.what() << std::endl;
         return false;
     }
 }
 
-void MqttTransport::subscribe(const std::vector<std::string>& topics, const std::vector<int>& qos)
+void MqttTransport::subscribe(const std::vector<std::string> &topics, const std::vector<int> &qos)
 {
     try
     {
-        for (auto& t : topics)
+        for (auto &t : topics)
         {
             std::cout << "topic " << t << std::endl;
         }
         client_.subscribe(topics, qos);
-        sub_client_.subscribe({"0E20H-0", "0E20H-1", "0E20H-2", "0220H-0", "0220H-1", "0220H-2"},
-                              {0, 0, 0, 0, 0, 0});
+        sub_client_.subscribe({"0E20H-0", "0E20H-1", "0E20H-2", "0220H-0", "0220H-1", "0220H-2"}, {0, 0, 0, 0, 0, 0});
     }
-    catch (const mqtt::exception& e)
+    catch (const mqtt::exception &e)
     {
         std::cerr << "Subscription failed: " << e.what() << std::endl;
     }
@@ -84,10 +80,10 @@ void MqttTransport::getNewMessage()
 {
     try
     {
-        client_.consume_message();  // 阻塞等待新消息,触发回调函数
+        client_.consume_message(); // 阻塞等待新消息,触发回调函数
         sub_client_.consume_message();
     }
-    catch (const mqtt::exception& e)
+    catch (const mqtt::exception &e)
     {
         std::cerr << "can't consume message: " << e.what() << std::endl;
     }
@@ -98,7 +94,10 @@ void MqttTransport::message_arrived(mqtt::const_message_ptr msg)
     auto topic = msg->get_topic();
     auto payload = msg->get_payload();
     nlohmann::json json_data = nlohmann::json::parse(payload);
-    // std::cout << "Received message on topic " << topic << ": " << json_data.dump(4) << std::endl;
+    if (topic == "0111")
+    {
+        std::cout << "Received message on topic " << topic << ", run handle_" << topic << std::endl;
+    }
     auto it = topic_handlers_.find(topic);
     if (it != topic_handlers_.end())
         it->second(json_data, topic);
@@ -106,7 +105,7 @@ void MqttTransport::message_arrived(mqtt::const_message_ptr msg)
         std::cerr << "No handler for topic: " << topic << std::endl;
 }
 
-void MqttTransport::on_success(const mqtt::token& tok)
+void MqttTransport::on_success(const mqtt::token &tok)
 {
 #ifdef DEBUG
     if (tok.get_type() == mqtt::token::Type::CONNECT)
@@ -116,7 +115,7 @@ void MqttTransport::on_success(const mqtt::token& tok)
 #endif
 }
 
-void MqttTransport::on_failure(const mqtt::token& tok)
+void MqttTransport::on_failure(const mqtt::token &tok)
 {
 #ifdef DEBUG
     std::cout << "[MQTT] publish failure " << std::endl;
@@ -150,10 +149,10 @@ void MqttTransport::loadConfig()
 
     if (driver_topics)
     {
-        for (const auto& item : driver_topics)
+        for (const auto &item : driver_topics)
         {
             std::string key = item.first.as<std::string>();
-            const auto& val = item.second;
+            const auto &val = item.second;
 
             if (val.IsScalar())
             {
@@ -162,25 +161,21 @@ void MqttTransport::loadConfig()
 
                 if (key == "vessel_site_info")
                     topic_handlers_[topic] =
-                        std::bind(&MqttTransport::handle_0411, this, std::placeholders::_1,
-                                  std::placeholders::_2);
+                        std::bind(&MqttTransport::handle_0411, this, std::placeholders::_1, std::placeholders::_2);
                 else if (key == "nav_radar")
                     topic_handlers_[topic] =
-                        std::bind(&MqttTransport::handle_0111, this, std::placeholders::_1,
-                                  std::placeholders::_2);
+                        std::bind(&MqttTransport::handle_0111, this, std::placeholders::_1, std::placeholders::_2);
                 else if (key == "ais_moving_target")
                     topic_handlers_[topic] =
-                        std::bind(&MqttTransport::handle_0421, this, std::placeholders::_1,
-                                  std::placeholders::_2);
+                        std::bind(&MqttTransport::handle_0421, this, std::placeholders::_1, std::placeholders::_2);
                 else if (key == "laser_radar")
                     topic_handlers_[topic] =
-                        std::bind(&MqttTransport::handle_0131, this, std::placeholders::_1,
-                                  std::placeholders::_2);
+                        std::bind(&MqttTransport::handle_0131, this, std::placeholders::_1, std::placeholders::_2);
             }
-            else if (val.IsSequence())  // single_vessel_underwater, single_vessel_surface
+            else if (val.IsSequence()) // single_vessel_underwater, single_vessel_surface
             {
                 std::cout << "  " << key << " (sequence):\n";
-                for (const auto& sub : val)
+                for (const auto &sub : val)
                 {
                     if (!sub["name"] || !sub["topic"])
                         continue;
@@ -194,29 +189,23 @@ void MqttTransport::loadConfig()
                               << " | extent_id: " << extent_id << std::endl;
 
                     if (name == "single_vessel_surface_motion_attributes")
-                        topic_handlers_[topic] =
-                            std::bind(&MqttTransport::handle_0E20H0, this, std::placeholders::_1,
-                                      std::placeholders::_2);
+                        topic_handlers_[topic] = std::bind(&MqttTransport::handle_0E20H0, this, std::placeholders::_1,
+                                                           std::placeholders::_2);
                     else if (name == "single_vessel_surface_identification")
-                        topic_handlers_[topic] =
-                            std::bind(&MqttTransport::handle_0E20H1, this, std::placeholders::_1,
-                                      std::placeholders::_2);
+                        topic_handlers_[topic] = std::bind(&MqttTransport::handle_0E20H1, this, std::placeholders::_1,
+                                                           std::placeholders::_2);
                     else if (name == "single_vessel_surface_name")
-                        topic_handlers_[topic] =
-                            std::bind(&MqttTransport::handle_0E20H2, this, std::placeholders::_1,
-                                      std::placeholders::_2);
+                        topic_handlers_[topic] = std::bind(&MqttTransport::handle_0E20H2, this, std::placeholders::_1,
+                                                           std::placeholders::_2);
                     else if (name == "single_vessel_underwater_motion_attributes")
-                        topic_handlers_[topic] =
-                            std::bind(&MqttTransport::handle_underwater_motion, this,
-                                      std::placeholders::_1, std::placeholders::_2);
+                        topic_handlers_[topic] = std::bind(&MqttTransport::handle_underwater_motion, this,
+                                                           std::placeholders::_1, std::placeholders::_2);
                     else if (name == "single_vessel_underwater_identification")
-                        topic_handlers_[topic] =
-                            std::bind(&MqttTransport::handle_underwater_identification, this,
-                                      std::placeholders::_1, std::placeholders::_2);
+                        topic_handlers_[topic] = std::bind(&MqttTransport::handle_underwater_identification, this,
+                                                           std::placeholders::_1, std::placeholders::_2);
                     else if (name == "single_vessel_underwater_name")
-                        topic_handlers_[topic] =
-                            std::bind(&MqttTransport::handle_underwater_name, this,
-                                      std::placeholders::_1, std::placeholders::_2);
+                        topic_handlers_[topic] = std::bind(&MqttTransport::handle_underwater_name, this,
+                                                           std::placeholders::_1, std::placeholders::_2);
                 }
             }
         }
@@ -224,7 +213,7 @@ void MqttTransport::loadConfig()
     if (reporter_topic && reporter_topic.IsSequence())
     {
         std::cout << "\n[MQTT Topics from reporter.object_status.mqtt_topics.fused]:\n";
-        for (const auto& item : reporter_topic)
+        for (const auto &item : reporter_topic)
         {
             if (!item["name"] || !item["topic"])
                 continue;
@@ -234,18 +223,18 @@ void MqttTransport::loadConfig()
             int id = item["id"] ? item["id"].as<int>() : 0;
             int extent_id = item["extent_id"] ? item["extent_id"].as<int>() : 0;
 
-            std::cout << "  - " << name << " | topic: " << topic << " | id: " << id
-                      << " | extent_id: " << extent_id << std::endl;
+            std::cout << "  - " << name << " | topic: " << topic << " | id: " << id << " | extent_id: " << extent_id
+                      << std::endl;
 
             if (name == "cluster_surface_motion_attributes")
-                topic_handlers_[topic] = std::bind(&MqttTransport::handle_0220H0, this,
-                                                   std::placeholders::_1, std::placeholders::_2);
+                topic_handlers_[topic] =
+                    std::bind(&MqttTransport::handle_0220H0, this, std::placeholders::_1, std::placeholders::_2);
             else if (name == "cluster_surface_identification")
-                topic_handlers_[topic] = std::bind(&MqttTransport::handle_0220H1, this,
-                                                   std::placeholders::_1, std::placeholders::_2);
+                topic_handlers_[topic] =
+                    std::bind(&MqttTransport::handle_0220H1, this, std::placeholders::_1, std::placeholders::_2);
             else if (name == "cluster_surface_name")
-                topic_handlers_[topic] = std::bind(&MqttTransport::handle_0220H2, this,
-                                                   std::placeholders::_1, std::placeholders::_2);
+                topic_handlers_[topic] =
+                    std::bind(&MqttTransport::handle_0220H2, this, std::placeholders::_1, std::placeholders::_2);
             //
         }
     }
@@ -255,9 +244,9 @@ void MqttTransport::loadConfig()
     }
 }
 
-void MqttTransport::handle_0041(const nlohmann::json& json_msg, const std::string& topic)
+void MqttTransport::handle_0041(const nlohmann::json &json_msg, const std::string &topic)
 {
-    const auto& content = json_msg.at("content");
+    const auto &content = json_msg.at("content");
 
     uint8_t type = content.value("type", 0);
 
@@ -266,7 +255,8 @@ void MqttTransport::handle_0041(const nlohmann::json& json_msg, const std::strin
     else
         is_simple_waterarea = false;
 }
-// 0042 区域过滤
+// 0042 区域过滤 v1
+/*
 void MqttTransport::handle_0042(const nlohmann::json& json_msg, const std::string& topic)
 {
     if (!json_msg.is_array() || json_msg.empty())
@@ -310,7 +300,86 @@ void MqttTransport::handle_0042(const nlohmann::json& json_msg, const std::strin
 
     areaMap[area.areasFuncId] = area;
 
-    //std::cout << "handle_0042: updated areaMap with ID=" << area.areasFuncId << ", polygon points=" << area.polygon.size() << "\n";
+    //std::cout << "handle_0042: updated areaMap with ID=" << area.areasFuncId << ", polygon points=" <<
+area.polygon.size() << "\n";
+}*/
+
+// v2
+void MqttTransport::handle_0042(const nlohmann::json &json_msg, const std::string &topic)
+{
+    if (!json_msg.is_array() || json_msg.empty())
+    {
+        std::cerr << "handle_0042: json_msg is not array or empty\n";
+        return;
+    }
+
+    const auto &area_obj = json_msg[0];
+    if (!area_obj.contains("areasFuncId") || !area_obj.contains("polygonNumber") || !area_obj.contains("polygon"))
+    {
+        std::cerr << "handle_0042: missing required fields\n";
+        return;
+    }
+
+    Area area;
+    area.areasFuncId = area_obj["areasFuncId"].get<int>();
+    area.polygonNumber = area_obj["polygonNumber"].get<int>();
+    area.polygon.clear();
+
+    const auto &polygon_json = area_obj["polygon"];
+    if (!polygon_json.is_array())
+    {
+        std::cerr << "handle_0042: polygon field not array\n";
+        return;
+    }
+
+    double minLat = std::numeric_limits<double>::max();
+    double maxLat = std::numeric_limits<double>::lowest();
+    double minLon = std::numeric_limits<double>::max();
+    double maxLon = std::numeric_limits<double>::lowest();
+
+    for (const auto &pt_json : polygon_json)
+    {
+        if (pt_json.contains("areaPointsLatitude") && pt_json.contains("areaPointsLongitude"))
+        {
+            double lat = pt_json["areaPointsLatitude"].get<double>();
+            double lon = pt_json["areaPointsLongitude"].get<double>();
+
+            area.polygon.push_back({lat, lon});
+
+            // 更新包围盒
+            minLat = std::min(minLat, lat);
+            maxLat = std::max(maxLat, lat);
+            minLon = std::min(minLon, lon);
+            maxLon = std::max(maxLon, lon);
+        }
+    }
+
+    if ((int)area.polygon.size() != area.polygonNumber)
+        std::cerr << "handle_0042: Warning polygonNumber mismatch\n";
+
+    // 初始化 LocalCartesian 投影
+    if (!area.polygon.empty())
+    {
+        area.proj.Reset(area.polygon[0].lat, area.polygon[0].lon, 0);
+
+        // 预计算投影坐标
+        area.polygonXY.clear();
+        area.polygonXY.reserve(area.polygon.size());
+        for (const auto &p : area.polygon)
+        {
+            double x, y, z;
+            area.proj.Forward(p.lat, p.lon, 0, x, y, z);
+            area.polygonXY.emplace_back(x, y);
+        }
+    }
+
+    area.minLat = minLat;
+    area.maxLat = maxLat;
+    area.minLon = minLon;
+    area.maxLon = maxLon;
+
+    // 存入容器
+    areaMap[area.areasFuncId] = area;
 }
 
 // 组件协议
@@ -318,7 +387,7 @@ void MqttTransport::handle_0051()
 {
     nlohmann::json msg;
     msg["content"]["Id"] = COMPONENT_THIS;
-    msg["content"]["state"] = 1;  // 默认正常
+    msg["content"]["state"] = 1; // 默认正常
     msg["content"]["info"] = nlohmann::json::array();
     int error_count = 0;
 
@@ -341,7 +410,7 @@ void MqttTransport::handle_0051()
     msg["content"]["count"] = error_count;
     if (error_count > 0)
     {
-        msg["content"]["state"] = 0;  // 异常
+        msg["content"]["state"] = 0; // 异常
     }
 
     mqtt::message_ptr pmsg = mqtt::make_message("0051", msg.dump());
@@ -359,15 +428,15 @@ void MqttTransport::heartbeatsLoop()
 }
 
 // 导航雷达
-void MqttTransport::handle_0111(const nlohmann::json& json_msg, const std::string& topic)
+void MqttTransport::handle_0111(const nlohmann::json &json_msg, const std::string &topic)
 {
-    std::cout<<"handle_0111"<<std::endl;
-    //sensor_last_recv_time_[COMPONENT_0111] = std::chrono::steady_clock::now();
+    std::cout << "handle_0111" << std::endl;
+    // sensor_last_recv_time_[COMPONENT_0111] = std::chrono::steady_clock::now();
     try
     {
-        const auto& head_in = json_msg.at("head");
-        const auto& content_in = json_msg.at("content");
-        const auto& targets_in = content_in.at("targets");
+        const auto &head_in = json_msg.at("head");
+        const auto &content_in = json_msg.at("content");
+        const auto &targets_in = content_in.at("targets");
 
         nlohmann::json output;
 
@@ -381,21 +450,20 @@ void MqttTransport::handle_0111(const nlohmann::json& json_msg, const std::strin
         // ========== content[0] ==========
         nlohmann::json unit;
 
-        unit["infoUnitHead"] = {
-            {"destPlatformId", 1793},
-            {"infoSourceTypeId", 0},
-            {"infoUnitCreateTime", getCurrentTimeString().substr(11)},  // "HH:MM:SS.xxx"
-            {"infoUnitExtentId", 0},
-            {"infoUnitID", 0x03},
-            {"infoUnitLength", 0},
-            {"secondInfoUnitId", 3619},
-            {"sourcePlatformId", 3073}};
+        unit["infoUnitHead"] = {{"destPlatformId", 1793},
+                                {"infoSourceTypeId", 0},
+                                {"infoUnitCreateTime", getCurrentTimeString().substr(11)}, // "HH:MM:SS.xxx"
+                                {"infoUnitExtentId", 0},
+                                {"infoUnitID", 0x03},
+                                {"infoUnitLength", 0},
+                                {"secondInfoUnitId", 3619},
+                                {"sourcePlatformId", 3073}};
 
         nlohmann::json content_out;
         content_out["targetNumber"] = content_in.value("count", 0);
         content_out["targets"] = nlohmann::json::array();
 
-        for (const auto& t : targets_in)
+        for (const auto &t : targets_in)
         {
             nlohmann::json tgt;
 
@@ -432,20 +500,20 @@ void MqttTransport::handle_0111(const nlohmann::json& json_msg, const std::strin
 
         publish("0E23H-0", output);
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
         std::cerr << "Error in handle_0111: " << e.what() << std::endl;
     }
 }
 // 接受AIS协议0421
-void MqttTransport::handle_0421(const nlohmann::json& json_msg, const std::string& topic)
+void MqttTransport::handle_0421(const nlohmann::json &json_msg, const std::string &topic)
 {
     sensor_last_recv_time_[COMPONENT_0421] = std::chrono::steady_clock::now();
     nlohmann::json output;
     try
     {
         // 构造 head
-        const auto& head_in = json_msg.at("head");
+        const auto &head_in = json_msg.at("head");
         output["head"]["destIP"] = "";
         output["head"]["sendIP"] = "";
         output["head"]["packageSerialNumber"] = head_in.value("packageSeq", 0);
@@ -453,7 +521,7 @@ void MqttTransport::handle_0421(const nlohmann::json& json_msg, const std::strin
         output["head"]["packageId"] = 0;
 
         // 构造 content
-        const auto& content_in = json_msg.at("content");
+        const auto &content_in = json_msg.at("content");
         nlohmann::json unit;
 
         nlohmann::json infoUnitContent;
@@ -478,8 +546,7 @@ void MqttTransport::handle_0421(const nlohmann::json& json_msg, const std::strin
         nlohmann::json infoUnitHead;
         infoUnitHead["destPlatformId"] = 1739;
         infoUnitHead["sourcePlatformId"] = 3073;
-        infoUnitHead["infoUnitCreateTime"] =
-            getCurrentTimeString().substr(11);  // eg. "11:31:36.300"
+        infoUnitHead["infoUnitCreateTime"] = getCurrentTimeString().substr(11); // eg. "11:31:36.300"
         infoUnitHead["infoUnitExtentId"] = 1;
         infoUnitHead["infoUnitID"] = 0x03;
         infoUnitHead["infoUnitLength"] = 0;
@@ -492,20 +559,20 @@ void MqttTransport::handle_0421(const nlohmann::json& json_msg, const std::strin
 
         publish("0E30H-1", output);
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
         std::cerr << "Error: " << e.what() << std::endl;
     }
 }
 // 接受激光雷达目标协议0131
-void MqttTransport::handle_0131(const nlohmann::json& json_msg, const std::string& topic)
+void MqttTransport::handle_0131(const nlohmann::json &json_msg, const std::string &topic)
 {
     sensor_last_recv_time_[COMPONENT_0131] = std::chrono::steady_clock::now();
     nlohmann::json output;
     try
     {
         // head
-        const auto& head_in = json_msg.at("head");
+        const auto &head_in = json_msg.at("head");
         output["head"] = {{"packageSerialNumber", head_in.value("packageSeq", 0)},
                           {"packageId", 0},
                           {"packageConfirmNumber", 0},
@@ -513,18 +580,18 @@ void MqttTransport::handle_0131(const nlohmann::json& json_msg, const std::strin
                           {"destIP", ""}};
         nlohmann::json info_unit;
         nlohmann::json content_out;
-        const auto& content_in = json_msg.at("content");
-        const auto& targets = content_in.at("targets");
+        const auto &content_in = json_msg.at("content");
+        const auto &targets = content_in.at("targets");
 
         content_out["targetNumber"] = static_cast<int>(targets.size());
         content_out["targets"] = nlohmann::json::array();
 
-        for (const auto& t : targets)
+        for (const auto &t : targets)
         {
             nlohmann::json target;
 
             target["targetId"] = t.value("batch", 0);
-            //std::cout << "targetId: " << target["targetId"] << std::endl;
+            // std::cout << "targetId: " << target["targetId"] << std::endl;
             target["targetAbsoluteDirection"] = t.value("absAzimuth", 0.0);
             target["targetDistance"] = t.value("distance", 0.0);
             target["targetAbsoluteSpeed"] = t.value("absSpeed", 0.0);
@@ -555,14 +622,10 @@ void MqttTransport::handle_0131(const nlohmann::json& json_msg, const std::strin
 
         // infoUnitHead 置零
         info_unit["infoUnitHead"] = {
-            {"infoUnitID", 0x03},
-            {"secondInfoUnitId", 3621},
-            {"sourcePlatformId", 3073},
-            {"destPlatformId", 1793},
-            {"infoUnitLength", 0},
-            {"infoUnitExtentId", 2},
-            {"infoSourceTypeId", 0},
-            {"infoUnitCreateTime", getCurrentTimeString().substr(11)}  // 仅保留 HH:mm:ss.sss
+            {"infoUnitID", 0x03},       {"secondInfoUnitId", 3621},
+            {"sourcePlatformId", 3073}, {"destPlatformId", 1793},
+            {"infoUnitLength", 0},      {"infoUnitExtentId", 2},
+            {"infoSourceTypeId", 0},    {"infoUnitCreateTime", getCurrentTimeString().substr(11)} // 仅保留 HH:mm:ss.sss
         };
 
         output["content"] = nlohmann::json::array({info_unit});
@@ -575,24 +638,24 @@ void MqttTransport::handle_0131(const nlohmann::json& json_msg, const std::strin
 
         // publish("0E25H-2", output);
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
         std::cout << "Error: " << e.what() << std::endl;
     }
 }
 // 接受目标识别协议0121 光电相关
-void MqttTransport::handle_0121(const nlohmann::json& json_msg, const std::string& topic)
+void MqttTransport::handle_0121(const nlohmann::json &json_msg, const std::string &topic)
 {
     // std::cout<<"[0121] "<<json_msg.dump()<<std::endl;
     try
     {
         TargetRecognition targetRec_;
-        const auto& content = json_msg.at("content");
+        const auto &content = json_msg.at("content");
         targetRec_.batch = content.value("batch", 0.0);
         targetRec_.sign = content.value("sign", 0);
         targetRec_.source = content.value("source", 0);
         targetRec_.type = content.value("type", 0.0);
-        targetRec_.color = content.value("color",0);
+        targetRec_.color = content.value("color", 0);
         {
             std::string code_str = content.value("code", "");
             std::strncpy(targetRec_.code, code_str.c_str(), sizeof(targetRec_.code) - 1);
@@ -605,18 +668,18 @@ void MqttTransport::handle_0121(const nlohmann::json& json_msg, const std::strin
 
         target_recongnition_[targetRec_.batch] = targetRec_;
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
         std::cout << "Error handle_0121:" << e.what() << std::endl;
     }
 }
 // 接受目标信息修订协议0151，然后可以修改指定批号目标的类型等等
-void MqttTransport::handle_0151(const nlohmann::json& json_msg, const std::string& topic)
+void MqttTransport::handle_0151(const nlohmann::json &json_msg, const std::string &topic)
 {
     try
     {
         TargetRevision trv;
-        const auto& content = json_msg.at("content");
+        const auto &content = json_msg.at("content");
 
         trv.batch = content.value("batch", 0);
         trv.color = content.value("color", 0);
@@ -628,19 +691,19 @@ void MqttTransport::handle_0151(const nlohmann::json& json_msg, const std::strin
 
         target_revisions_[trv.batch] = trv;
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
         std::cout << "Handle_0151 Error : " << e.what() << std::endl;
     }
 }
 // 接受导航共享协议0A11，接收其他个平台发来的位置信息
-void MqttTransport::handle_0A11(const nlohmann::json& json_msg, const std::string& topic)
+void MqttTransport::handle_0A11(const nlohmann::json &json_msg, const std::string &topic)
 {
     nlohmann::json output;
     try
     {
         // head
-        const auto& head_in = json_msg.at("head");
+        const auto &head_in = json_msg.at("head");
         output["head"] = {{"packageId", 0},
                           {"packageSerialNumber", head_in.value("packageSeq", 0)},
                           {"packageConfirmNumber", 0},
@@ -649,7 +712,7 @@ void MqttTransport::handle_0A11(const nlohmann::json& json_msg, const std::strin
 
         nlohmann::json unit;
         // content
-        const auto& content = json_msg.at("content");
+        const auto &content = json_msg.at("content");
         // infoUnitContent
         nlohmann::json infoUnitContent;
         infoUnitContent["longitude"] = content.value("longitude", 0);
@@ -673,23 +736,23 @@ void MqttTransport::handle_0A11(const nlohmann::json& json_msg, const std::strin
         unit["infoUnitContent"] = infoUnitContent;
         unit["infoUnitHead"] = infoUnitHead;
         output["content"] = nlohmann::json::array({unit});
-        //std::cout << "[0A11 output]" << output.dump(4) << std::endl;
+        // std::cout << "[0A11 output]" << output.dump(4) << std::endl;
         publish("0E23H-0", output);
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
         std::cout << "Error : " << e.what() << std::endl;
     }
 }
 // 接收单艇导航协议0411，获取本艇的位置姿态信息
-void MqttTransport::handle_0411(const nlohmann::json& json_msg, const std::string& topic)
+void MqttTransport::handle_0411(const nlohmann::json &json_msg, const std::string &topic)
 {
     // std::cout<<"[0411] "<<json_msg.dump(4)<<std::endl;
     nlohmann::json output;
     try
     {
         // head
-        const auto& head_in = json_msg.at("head");
+        const auto &head_in = json_msg.at("head");
         output["head"] = {{"packageId", 0},
                           {"packageSerialNumber", head_in.value("packageSeq", 0)},
                           {"packageConfirmNumber", 0},
@@ -698,21 +761,21 @@ void MqttTransport::handle_0411(const nlohmann::json& json_msg, const std::strin
 
         // content
         nlohmann::json unit;
-        const auto& content = json_msg.at("content");
+        const auto &content = json_msg.at("content");
 
         nlohmann::json infoUnitContent;
         infoUnitContent["targetLongitude"] = content.value("longitude", 0.0);
         infoUnitContent["targetLatitude"] = content.value("latitude", 0.0);
         self_longitude_ = infoUnitContent["targetLongitude"];
         self_latitude_ = infoUnitContent["targetLatitude"];
-        //std::cout << "self longitude " << self_longitude_ << std::endl;
-        //std::cout << "self latitude " << self_latitude_ << std::endl;
+        // std::cout << "self longitude " << self_longitude_ << std::endl;
+        // std::cout << "self latitude " << self_latitude_ << std::endl;
         infoUnitContent["targetHeight"] = content.value("height", 0.0);
         infoUnitContent["targetAbsoluteSpeed"] = content.value("speed", 0.0);
         infoUnitContent["targetAbsoluteDirection"] = content.value("course", 0.0);
         infoUnitContent["headingAngle"] = content.value("heading", 0.0);
         self_heading_ = infoUnitContent["headingAngle"];
-        //std::cout << "self heading " << self_heading_ << std::endl;
+        // std::cout << "self heading " << self_heading_ << std::endl;
         infoUnitContent["eastSpeed"] = content.value("eastSpeed", 0.0);
         infoUnitContent["northSpeed"] = content.value("northSpeed", 0.0);
         infoUnitContent["heavingSpeed"] = content.value("verticalSpeed", 0.0);
@@ -746,21 +809,21 @@ void MqttTransport::handle_0411(const nlohmann::json& json_msg, const std::strin
 
         publish("0E9DH-3", output);
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
-        std::cerr << "[handle_0411] Error: " << e.what() << std::endl;
+        // std::cerr << "[handle_0411] Error: " << e.what() << std::endl;
     }
 }
 
 // 接收人工增加目标协议0152
-void MqttTransport::handle_0152(const nlohmann::json& json_msg, const std::string& topic)
+void MqttTransport::handle_0152(const nlohmann::json &json_msg, const std::string &topic)
 {
     try
     {
         const auto content = json_msg.at("content");
-        const auto& targets = content.at("targets");
+        const auto &targets = content.at("targets");
 
-        for (const auto& t : targets)
+        for (const auto &t : targets)
         {
             ManualTarget mt;
             mt.id = t.value("batch", 0);
@@ -769,50 +832,48 @@ void MqttTransport::handle_0152(const nlohmann::json& json_msg, const std::strin
             mt.longitude = t.value("longitude", 0.0);
             mt.latitude = t.value("latitude", 0.0);
             mt.type = t.value("type", 0);
-            mt.lastUpdateTime = std::chrono::steady_clock::now();  // 更新时间戳
-            //std::cout << "id:" << mt.id << " absspeed:" << mt.absSpeed
-            //        << " absCourse:" << mt.absCourse << " longitude:" << mt.longitude
-            //         << " latitude:" << mt.latitude << " type:" << mt.type << std::endl;
+            mt.lastUpdateTime = std::chrono::steady_clock::now(); // 更新时间戳
+            // std::cout << "id:" << mt.id << " absspeed:" << mt.absSpeed
+            //         << " absCourse:" << mt.absCourse << " longitude:" << mt.longitude
+            //          << " latitude:" << mt.latitude << " type:" << mt.type << std::endl;
             manual_targets_[mt.id] = mt;
         }
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
         std::cout << "handle_0152 Error : " << e.what() << std::endl;
     }
 }
 
-void MqttTransport::handle_0E20H0(const nlohmann::json& json_msg, const std::string& topic)
+void MqttTransport::handle_0E20H0(const nlohmann::json &json_msg, const std::string &topic)
 {
-    //std::cout << "[0E20H-0 ]" << json_msg.dump(4) << std::endl;
+    // std::cout << "[0E20H-0 ]" << json_msg.dump(4) << std::endl;
     try
     {
-        if (!json_msg.contains("content") || !json_msg["content"].is_array() ||
-            json_msg["content"].empty())
+        if (!json_msg.contains("content") || !json_msg["content"].is_array() || json_msg["content"].empty())
         {
             std::cerr << "[0E20H-0] Invalid JSON: missing or empty 'content'" << std::endl;
             return;
         }
-        const auto& content = json_msg["content"][0];
-        if (!content.contains("infoUnitContent") ||
-            !content["infoUnitContent"].contains("targets") ||
+        const auto &content = json_msg["content"][0];
+        if (!content.contains("infoUnitContent") || !content["infoUnitContent"].contains("targets") ||
             !content["infoUnitContent"]["targets"].is_array())
         {
             std::cerr << "[0E20H-0] Invalid JSON: missing 'infoUnitContent.targets'" << std::endl;
             return;
         }
 
-        for (const auto& target : content["infoUnitContent"]["targets"])
+        for (const auto &target : content["infoUnitContent"]["targets"])
         {
             int targetId = target.value("targetId", -1);
-            //std::cout << "[targetId ]" << targetId << std::endl;
+            // std::cout << "[targetId ]" << targetId << std::endl;
             if (targetId == -1)
             {
                 std::cerr << "[0E20H-0] Invalid targetId" << std::endl;
                 continue;
             }
 
-            auto& cache = target_cache[targetId];
+            auto &cache = target_cache[targetId];
             cache.part0 = target;
             cache.has0 = true;
             cache.last_update = std::chrono::steady_clock::now();
@@ -820,34 +881,32 @@ void MqttTransport::handle_0E20H0(const nlohmann::json& json_msg, const std::str
         std::cout << "try merge" << std::endl;
         tryMerge();
     }
-    catch (const nlohmann::json::type_error& e)
+    catch (const nlohmann::json::type_error &e)
     {
         std::cerr << "[0E20H-0] Exception: " << e.what() << std::endl;
     }
 }
 
-void MqttTransport::handle_0E20H1(const nlohmann::json& json_msg, const std::string& topic)
+void MqttTransport::handle_0E20H1(const nlohmann::json &json_msg, const std::string &topic)
 {
     // mqtt::message_ptr msg = mqtt::make_message("0E20H-1", json_msg.dump());
     // pubOr_client_.publish(msg, nullptr, *this);
     try
     {
-        if (!json_msg.contains("content") || !json_msg["content"].is_array() ||
-            json_msg["content"].empty())
+        if (!json_msg.contains("content") || !json_msg["content"].is_array() || json_msg["content"].empty())
         {
             std::cerr << "[0E20H-1] Invalid JSON: missing or empty 'content'" << std::endl;
             return;
         }
-        const auto& content = json_msg["content"][0];
-        if (!content.contains("infoUnitContent") ||
-            !content["infoUnitContent"].contains("targets") ||
+        const auto &content = json_msg["content"][0];
+        if (!content.contains("infoUnitContent") || !content["infoUnitContent"].contains("targets") ||
             !content["infoUnitContent"]["targets"].is_array())
         {
             std::cerr << "[0E20H-1] Invalid JSON: missing 'infoUnitContent.targets'" << std::endl;
             return;
         }
 
-        for (const auto& target : content["infoUnitContent"]["targets"])
+        for (const auto &target : content["infoUnitContent"]["targets"])
         {
             int targetId = target.value("targetId", -1);
             if (targetId == -1)
@@ -856,41 +915,39 @@ void MqttTransport::handle_0E20H1(const nlohmann::json& json_msg, const std::str
                 continue;
             }
 
-            auto& cache = target_cache[targetId];
+            auto &cache = target_cache[targetId];
             cache.part1 = target;
             cache.has1 = true;
             cache.last_update = std::chrono::steady_clock::now();
         }
         tryMerge();
     }
-    catch (const nlohmann::json::type_error& e)
+    catch (const nlohmann::json::type_error &e)
     {
         std::cerr << "[0E20H-1] Exception: " << e.what() << std::endl;
     }
 }
 
-void MqttTransport::handle_0E20H2(const nlohmann::json& json_msg, const std::string& topic)
+void MqttTransport::handle_0E20H2(const nlohmann::json &json_msg, const std::string &topic)
 {
     // mqtt::message_ptr msg = mqtt::make_message("0E20H-2", json_msg.dump());
     // pubOr_client_.publish(msg, nullptr, *this);
     try
     {
-        if (!json_msg.contains("content") || !json_msg["content"].is_array() ||
-            json_msg["content"].empty())
+        if (!json_msg.contains("content") || !json_msg["content"].is_array() || json_msg["content"].empty())
         {
             std::cerr << "[0E20H-2] Invalid JSON: missing or empty 'content'" << std::endl;
             return;
         }
-        const auto& content = json_msg["content"][0];
-        if (!content.contains("infoUnitContent") ||
-            !content["infoUnitContent"].contains("targets") ||
+        const auto &content = json_msg["content"][0];
+        if (!content.contains("infoUnitContent") || !content["infoUnitContent"].contains("targets") ||
             !content["infoUnitContent"]["targets"].is_array())
         {
             std::cerr << "[0E20H-2] Invalid JSON: missing 'infoUnitContent.targets'" << std::endl;
             return;
         }
 
-        for (const auto& target : content["infoUnitContent"]["targets"])
+        for (const auto &target : content["infoUnitContent"]["targets"])
         {
             int targetId = target.value("targetId", -1);
             if (targetId == -1)
@@ -899,37 +956,35 @@ void MqttTransport::handle_0E20H2(const nlohmann::json& json_msg, const std::str
                 continue;
             }
 
-            auto& cache = target_cache[targetId];
+            auto &cache = target_cache[targetId];
             cache.part2 = target;
             cache.has2 = true;
             cache.last_update = std::chrono::steady_clock::now();
         }
         tryMerge();
     }
-    catch (const nlohmann::json::type_error& e)
+    catch (const nlohmann::json::type_error &e)
     {
         std::cerr << "[0E20H-2] Exception: " << e.what() << std::endl;
     }
 }
 
-void MqttTransport::handle_underwater_motion(const nlohmann::json& json_msg,
-                                             const std::string& topic)
+void MqttTransport::handle_underwater_motion(const nlohmann::json &json_msg, const std::string &topic)
 {
     try
     {
-        if (!json_msg.contains("content") || !json_msg["content"].is_array() ||
-            json_msg["content"].empty())
+        if (!json_msg.contains("content") || !json_msg["content"].is_array() || json_msg["content"].empty())
         {
             std::cerr << "[0E21H-0] Invalid JSON: missing or empty 'content'" << std::endl;
             return;
         }
-        const auto& content = json_msg["content"][0];
+        const auto &content = json_msg["content"][0];
         if (!content.contains("infoUnitContent"))
         {
             std::cerr << "[0E21H-0] Invalid JSON: missing 'infoUnitContent'" << std::endl;
             return;
         }
-        const auto& info = content["infoUnitContent"];
+        const auto &info = content["infoUnitContent"];
         if (!info.contains("targets") || !info["targets"].is_array() || info["targets"].empty())
         {
             std::cerr << "[0E21H-0] Invalid JSON: missing or empty 'targets'" << std::endl;
@@ -943,35 +998,33 @@ void MqttTransport::handle_underwater_motion(const nlohmann::json& json_msg,
             return;
         }
 
-        auto& cache = target_cache[targetId];
+        auto &cache = target_cache[targetId];
         cache.part0 = json_msg;
         cache.has0 = true;
         cache.last_update = std::chrono::steady_clock::now();
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
         std::cerr << "[0E20H-1] Exception: " << e.what() << std::endl;
     }
 }
 
-void MqttTransport::handle_underwater_identification(const nlohmann::json& json_msg,
-                                                     const std::string& topic)
+void MqttTransport::handle_underwater_identification(const nlohmann::json &json_msg, const std::string &topic)
 {
     try
     {
-        if (!json_msg.contains("content") || !json_msg["content"].is_array() ||
-            json_msg["content"].empty())
+        if (!json_msg.contains("content") || !json_msg["content"].is_array() || json_msg["content"].empty())
         {
             std::cerr << "[0E21H-1] Invalid JSON: missing or empty 'content'" << std::endl;
             return;
         }
-        const auto& content = json_msg["content"][0];
+        const auto &content = json_msg["content"][0];
         if (!content.contains("infoUnitContent"))
         {
             std::cerr << "[0E21H-1] Invalid JSON: missing 'infoUnitContent'" << std::endl;
             return;
         }
-        const auto& info = content["infoUnitContent"];
+        const auto &info = content["infoUnitContent"];
         if (!info.contains("targets") || !info["targets"].is_array() || info["targets"].empty())
         {
             std::cerr << "[0E21H-1] Invalid JSON: missing or empty 'targets'" << std::endl;
@@ -985,33 +1038,32 @@ void MqttTransport::handle_underwater_identification(const nlohmann::json& json_
             return;
         }
 
-        auto& cache = target_cache[targetId];
+        auto &cache = target_cache[targetId];
         cache.part0 = json_msg;
         cache.has0 = true;
         cache.last_update = std::chrono::steady_clock::now();
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
         std::cerr << "[0E21H-1] Exception: " << e.what() << std::endl;
     }
 }
-void MqttTransport::handle_underwater_name(const nlohmann::json& json_msg, const std::string& topic)
+void MqttTransport::handle_underwater_name(const nlohmann::json &json_msg, const std::string &topic)
 {
     try
     {
-        if (!json_msg.contains("content") || !json_msg["content"].is_array() ||
-            json_msg["content"].empty())
+        if (!json_msg.contains("content") || !json_msg["content"].is_array() || json_msg["content"].empty())
         {
             std::cerr << "[0E21H-2] Invalid JSON: missing or empty 'content'" << std::endl;
             return;
         }
-        const auto& content = json_msg["content"][0];
+        const auto &content = json_msg["content"][0];
         if (!content.contains("infoUnitContent"))
         {
             std::cerr << "[0E20H-2] Invalid JSON: missing 'infoUnitContent'" << std::endl;
             return;
         }
-        const auto& info = content["infoUnitContent"];
+        const auto &info = content["infoUnitContent"];
         if (!info.contains("targets") || !info["targets"].is_array() || info["targets"].empty())
         {
             std::cerr << "[0E21H-2] Invalid JSON: missing or empty 'targets'" << std::endl;
@@ -1025,12 +1077,12 @@ void MqttTransport::handle_underwater_name(const nlohmann::json& json_msg, const
             return;
         }
 
-        auto& cache = target_cache[targetId];
+        auto &cache = target_cache[targetId];
         cache.part0 = json_msg;
         cache.has0 = true;
         cache.last_update = std::chrono::steady_clock::now();
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
         std::cerr << "[0E21H-2] Exception: " << e.what() << std::endl;
     }
@@ -1048,14 +1100,14 @@ std::string MqttTransport::getCurrentTimeString()
     return ss.str();
 }
 
-void MqttTransport::publish(const std::string& topic, const nlohmann::json& json_msg)
+void MqttTransport::publish(const std::string &topic, const nlohmann::json &json_msg)
 {
     try
     {
         mqtt::message_ptr msg = mqtt::make_message(topic, json_msg.dump());
         pub_client_.publish(msg, nullptr, *this);
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
         std::cerr << "Error: " << e.what() << std::endl;
     }
@@ -1067,15 +1119,14 @@ void MqttTransport::tryMerge()
     cleanupExpiredCaches();
 
     std::vector<int> readyIds;
-    for (const auto& [id, cache] : target_cache)
+    for (const auto &[id, cache] : target_cache)
     {
         if (cache.has0 && cache.has1 && cache.has2)
             readyIds.push_back(id);
         else
         {
-            //std::cout << "Don't have at least one target" << std::endl;
+            // std::cout << "Don't have at least one target" << std::endl;
         }
-            
     }
     if (!readyIds.empty())
     {
@@ -1083,7 +1134,7 @@ void MqttTransport::tryMerge()
     }
 }
 
-void MqttTransport::mergeAndOutput(const std::vector<int>& targetIds)
+void MqttTransport::mergeAndOutput(const std::vector<int> &targetIds)
 {
     nlohmann::json merged;
     merged["head"]["packageSeq"] = 1;
@@ -1094,33 +1145,32 @@ void MqttTransport::mergeAndOutput(const std::vector<int>& targetIds)
 
     for (int id : targetIds)
     {
-        //std::cout << "merged Id " << id << std::endl;
+        // std::cout << "merged Id " << id << std::endl;
         auto it = target_cache.find(id);
         if (it == target_cache.end())
             continue;
 
-        const auto& cache = it->second;
+        const auto &cache = it->second;
         if (!(cache.has0 && cache.has1 && cache.has2))
             continue;
 
-        const auto& t0 = cache.part0;
-        const auto& t1 = cache.part1;
-        const auto& t2 = cache.part2;
+        const auto &t0 = cache.part0;
+        const auto &t1 = cache.part1;
+        const auto &t2 = cache.part2;
 
         nlohmann::json tgt;
         tgt["batch"] = id;
         tgt["absSpeed"] = t0.value("targetAbsoluteSpeed", 0.0);
 
         auto cit = courses_.find(id);
-        tgt["absCourse"] =
-            (cit != courses_.end()) ? cit->second : t0.value("targetAbsoluteDirection", 0.0);
+        tgt["absCourse"] = (cit != courses_.end()) ? cit->second : t0.value("targetAbsoluteDirection", 0.0);
 
         tgt["heading"] = t0.value("targetRelativeDirection", 0.0);
         tgt["longitude"] = t0.value("targetLongitude", 0.0);
         tgt["latitude"] = t0.value("targetLatitude", 0.0);
         double longitude = tgt["longitude"];
         double latitude = tgt["latitude"];
-        
+        /*
         Point point(latitude,longitude);
         if (!isInAreaBuffered(point,1) && !is_simple_waterarea )
         {
@@ -1128,14 +1178,12 @@ void MqttTransport::mergeAndOutput(const std::vector<int>& targetIds)
             target_cache.erase(it);
             continue;
         }
-        
-        
-        double distance =
-            GeoUtils::computeDistance(self_longitude_, self_latitude_, longitude, latitude);
+        */
+
+        double distance = GeoUtils::computeDistance(self_longitude_, self_latitude_, longitude, latitude);
         // std::cout << "距离: " << distance << " 米" << std::endl;
 
-        double absAzimuth =
-            GeoUtils::computeBearing(self_longitude_, self_latitude_, longitude, latitude);
+        double absAzimuth = GeoUtils::computeBearing(self_longitude_, self_latitude_, longitude, latitude);
         // std::cout<<"absAzimuth" <<absAzimuth<<std::endl;
 
         double relAzimuth = GeoUtils::computeRelBearing(absAzimuth, self_heading_);
@@ -1159,8 +1207,7 @@ void MqttTransport::mergeAndOutput(const std::vector<int>& targetIds)
         // tgt["shipWidth"] = t0.value("targetEdgeWidth", 0.0);
         // tgt["shipHeight"] = t0.value("targetHeight", 0.0);
         uint8_t type = t1.value("targetType", 0);
-        if (type == 4 || type == 5 || type == 6 || type == 7 || type == 8 || type == 9 ||
-            type == 10 || type == 11)
+        if (type == 4 || type == 5 || type == 6 || type == 7 || type == 8 || type == 9 || type == 10 || type == 11)
             type = 1;
         tgt["type"] = type;
         tgt["color"] = 0;
@@ -1175,12 +1222,12 @@ void MqttTransport::mergeAndOutput(const std::vector<int>& targetIds)
         tgt["MMSI"] = 0;
 
         auto source = t0.value("trackQualityNumber", 0);
-        //std::cout << "source " << source << std::endl;
+        // std::cout << "source " << source << std::endl;
 
-        if (source == (1 << 9))        // bit9 virtual target
-            source = 1 << 3;           // bit3
-        else if (source == (1 << 10))  // bit10 ais
-            source = 1 << 2;           // bit2
+        if (source == (1 << 9))       // bit9 virtual target
+            source = 1 << 3;          // bit3
+        else if (source == (1 << 10)) // bit10 ais
+            source = 1 << 2;          // bit2
 
         tgt["source"] = source;
 
@@ -1188,12 +1235,12 @@ void MqttTransport::mergeAndOutput(const std::vector<int>& targetIds)
         auto rec_it = target_recongnition_.find(id);
         if (rec_it != target_recongnition_.end())
         {
-            const auto& rec = rec_it->second;
+            const auto &rec = rec_it->second;
             tgt["sign"] = rec.sign;
             tgt["source"] = rec.source;
             auto typein = rec.type;
             if (typein == 4 || typein == 5 || typein == 6 || typein == 7 || typein == 8 || typein == 9 ||
-            typein == 10 || typein == 11)
+                typein == 10 || typein == 11)
             {
                 typein = 1;
             }
@@ -1203,29 +1250,28 @@ void MqttTransport::mergeAndOutput(const std::vector<int>& targetIds)
         }
         else
         {
-            //std::cerr << "cant't find id for 0121" << std::endl;
+            // std::cerr << "cant't find id for 0121" << std::endl;
         }
-            
 
         // 目标修订协议新增
         // 尝试从 target_revisions_ 获取识别信息
         auto rev_it = target_revisions_.find(id);
         if (rev_it != target_revisions_.end())
         {
-            const auto& rev = rev_it->second;
+            const auto &rev = rev_it->second;
             tgt["type"] = rev.type;
             tgt["color"] = rev.color;
             tgt["threatingRadius"] = rev.threatingRadius;
             tgt["code"] = rev.code;
         }
         targets.push_back(tgt);
-        target_cache.erase(it);  // 清除已处理的
+        target_cache.erase(it); // 清除已处理的
     }
 
     // 如果要人工增加目标
     using clock = std::chrono::steady_clock;
     auto now = clock::now();
-    auto expireDuration = std::chrono::seconds(3);  // 保活 3 秒
+    auto expireDuration = std::chrono::seconds(3); // 保活 3 秒
     for (auto it = manual_targets_.begin(); it != manual_targets_.end();)
     {
         if (now - it->second.lastUpdateTime > expireDuration)
@@ -1234,7 +1280,7 @@ void MqttTransport::mergeAndOutput(const std::vector<int>& targetIds)
             it = manual_targets_.erase(it);
             continue;
         }
-        const auto& mt = it->second;
+        const auto &mt = it->second;
         nlohmann::json tgt;
         tgt["batch"] = mt.id;
         tgt["absSpeed"] = mt.absSpeed;
@@ -1242,12 +1288,10 @@ void MqttTransport::mergeAndOutput(const std::vector<int>& targetIds)
         tgt["longitude"] = mt.longitude;
         tgt["latitude"] = mt.latitude;
 
-        double distance =
-            GeoUtils::computeDistance(self_longitude_, self_latitude_, mt.longitude, mt.latitude);
+        double distance = GeoUtils::computeDistance(self_longitude_, self_latitude_, mt.longitude, mt.latitude);
         // std::cout << "距离: " << distance << " 米" << std::endl;
 
-        double absAzimuth =
-            GeoUtils::computeBearing(self_longitude_, self_latitude_, mt.longitude, mt.latitude);
+        double absAzimuth = GeoUtils::computeBearing(self_longitude_, self_latitude_, mt.longitude, mt.latitude);
         // std::cout<<"absAzimuth" <<absAzimuth<<std::endl;
 
         double relAzimuth = GeoUtils::computeRelBearing(absAzimuth, self_heading_);
@@ -1275,7 +1319,7 @@ void MqttTransport::mergeAndOutput(const std::vector<int>& targetIds)
         auto rec_it = target_recongnition_.find(mt.id);
         if (rec_it != target_recongnition_.end())
         {
-            const auto& rec = rec_it->second;
+            const auto &rec = rec_it->second;
             tgt["sign"] = rec.sign;
             tgt["source"] = rec.source;
             tgt["type"] = rec.type;
@@ -1289,7 +1333,7 @@ void MqttTransport::mergeAndOutput(const std::vector<int>& targetIds)
         auto rev_it = target_revisions_.find(mt.id);
         if (rev_it != target_revisions_.end())
         {
-            const auto& rev = rev_it->second;
+            const auto &rev = rev_it->second;
             tgt["type"] = rev.type;
             tgt["color"] = rev.color;
             tgt["threatingRadius"] = rev.threatingRadius;
@@ -1302,7 +1346,7 @@ void MqttTransport::mergeAndOutput(const std::vector<int>& targetIds)
     // manual_targets_.clear();
     merged["content"]["count"] = targets.size();
     merged["content"]["targets"] = targets;
-    //std::cout << "[0141 Result] " << merged.dump(4) << std::endl;
+    // std::cout << "[0141 Result] " << merged.dump(4) << std::endl;
     if (!targets.empty())
     {
         mqtt::message_ptr msg = mqtt::make_message("0141", merged.dump());
@@ -1311,15 +1355,13 @@ void MqttTransport::mergeAndOutput(const std::vector<int>& targetIds)
     }
 }
 
-
-
 void MqttTransport::cleanupExpiredCaches()
 {
     using namespace std::chrono;
     auto now = steady_clock::now();
     for (auto it = target_cache.begin(); it != target_cache.end();)
     {
-        if (duration_cast<seconds>(now - it->second.last_update).count() > 40)  // 超过30秒没更新
+        if (duration_cast<seconds>(now - it->second.last_update).count() > 40) // 超过30秒没更新
         {
             it = target_cache.erase(it);
         }
@@ -1330,27 +1372,25 @@ void MqttTransport::cleanupExpiredCaches()
     }
 }
 
-void MqttTransport::handle_0220H0(const nlohmann::json& json_msg, const std::string& topic)
+void MqttTransport::handle_0220H0(const nlohmann::json &json_msg, const std::string &topic)
 {
     std::cout << "[0220H-0]" << json_msg.dump(4) << std::endl;
     try
     {
-        if (!json_msg.contains("content") || !json_msg["content"].is_array() ||
-            json_msg["content"].empty())
+        if (!json_msg.contains("content") || !json_msg["content"].is_array() || json_msg["content"].empty())
         {
             std::cerr << "[0220H-0] Invalid JSON: missing or empty 'content'" << std::endl;
             return;
         }
-        const auto& content = json_msg["content"][0];
-        if (!content.contains("infoUnitContent") ||
-            !content["infoUnitContent"].contains("targets") ||
+        const auto &content = json_msg["content"][0];
+        if (!content.contains("infoUnitContent") || !content["infoUnitContent"].contains("targets") ||
             !content["infoUnitContent"]["targets"].is_array())
         {
             std::cerr << "[0220H-0] Invalid JSON: missing 'infoUnitContent.targets'" << std::endl;
             return;
         }
 
-        for (const auto& target : content["infoUnitContent"]["targets"])
+        for (const auto &target : content["infoUnitContent"]["targets"])
         {
             int targetId = target.value("targetId", -1);
             std::cout << "[targetId ]" << targetId << std::endl;
@@ -1360,39 +1400,37 @@ void MqttTransport::handle_0220H0(const nlohmann::json& json_msg, const std::str
                 continue;
             }
 
-            auto& cache = cluster_target_cache[targetId];
+            auto &cache = cluster_target_cache[targetId];
             cache.part0 = target;
             cache.has0 = true;
             cache.last_update = std::chrono::steady_clock::now();
         }
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
         std::cerr << "[0E20H-0] Exception: " << e.what() << std::endl;
     }
 }
 
-void MqttTransport::handle_0220H1(const nlohmann::json& json_msg, const std::string& topic)
+void MqttTransport::handle_0220H1(const nlohmann::json &json_msg, const std::string &topic)
 {
     std::cout << "[0220H-1]" << json_msg.dump(4) << std::endl;
     try
     {
-        if (!json_msg.contains("content") || !json_msg["content"].is_array() ||
-            json_msg["content"].empty())
+        if (!json_msg.contains("content") || !json_msg["content"].is_array() || json_msg["content"].empty())
         {
             std::cerr << "[0220H-1] Invalid JSON: missing or empty 'content'" << std::endl;
             return;
         }
-        const auto& content = json_msg["content"][0];
-        if (!content.contains("infoUnitContent") ||
-            !content["infoUnitContent"].contains("targets") ||
+        const auto &content = json_msg["content"][0];
+        if (!content.contains("infoUnitContent") || !content["infoUnitContent"].contains("targets") ||
             !content["infoUnitContent"]["targets"].is_array())
         {
             std::cerr << "[0220H-1] Invalid JSON: missing 'infoUnitContent.targets'" << std::endl;
             return;
         }
 
-        for (const auto& target : content["infoUnitContent"]["targets"])
+        for (const auto &target : content["infoUnitContent"]["targets"])
         {
             int targetId = target.value("targetId", -1);
             std::cout << "[targetId ]" << targetId << std::endl;
@@ -1402,38 +1440,36 @@ void MqttTransport::handle_0220H1(const nlohmann::json& json_msg, const std::str
                 continue;
             }
 
-            auto& cache = cluster_target_cache[targetId];
+            auto &cache = cluster_target_cache[targetId];
             cache.part1 = target;
             cache.has1 = true;
             cache.last_update = std::chrono::steady_clock::now();
         }
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
         std::cerr << "[0E20H-1] Exception: " << e.what() << std::endl;
     }
 }
-void MqttTransport::handle_0220H2(const nlohmann::json& json_msg, const std::string& topic)
+void MqttTransport::handle_0220H2(const nlohmann::json &json_msg, const std::string &topic)
 {
     std::cout << "[0220H-2]" << json_msg.dump(4) << std::endl;
     try
     {
-        if (!json_msg.contains("content") || !json_msg["content"].is_array() ||
-            json_msg["content"].empty())
+        if (!json_msg.contains("content") || !json_msg["content"].is_array() || json_msg["content"].empty())
         {
             std::cerr << "[0220H-2] Invalid JSON: missing or empty 'content'" << std::endl;
             return;
         }
-        const auto& content = json_msg["content"][0];
-        if (!content.contains("infoUnitContent") ||
-            !content["infoUnitContent"].contains("targets") ||
+        const auto &content = json_msg["content"][0];
+        if (!content.contains("infoUnitContent") || !content["infoUnitContent"].contains("targets") ||
             !content["infoUnitContent"]["targets"].is_array())
         {
             std::cerr << "[0220H-2] Invalid JSON: missing 'infoUnitContent.targets'" << std::endl;
             return;
         }
 
-        for (const auto& target : content["infoUnitContent"]["targets"])
+        for (const auto &target : content["infoUnitContent"]["targets"])
         {
             int targetId = target.value("targetId", -1);
             std::cout << "[targetId ]" << targetId << std::endl;
@@ -1443,13 +1479,13 @@ void MqttTransport::handle_0220H2(const nlohmann::json& json_msg, const std::str
                 continue;
             }
 
-            auto& cache = cluster_target_cache[targetId];
+            auto &cache = cluster_target_cache[targetId];
             cache.part2 = target;
             cache.has2 = true;
             cache.last_update = std::chrono::steady_clock::now();
         }
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
         std::cerr << "[0E20H-2] Exception: " << e.what() << std::endl;
     }
@@ -1461,14 +1497,14 @@ void MqttTransport::tryClusterMerge()
     cleanupExpiredClusterCaches();
 
     std::vector<int> readyIds;
-    for (const auto& [id, cache] : cluster_target_cache)
+    for (const auto &[id, cache] : cluster_target_cache)
     {
         if (cache.has0 && cache.has1 && cache.has2)
             readyIds.push_back(id);
         else
             std::cout << "Don't have at least one target" << std::endl;
     }
-    for (const auto& i : readyIds)
+    for (const auto &i : readyIds)
     {
         std::cout << "[TargetID] " << i << std::endl;
     }
@@ -1478,7 +1514,7 @@ void MqttTransport::tryClusterMerge()
     }
 }
 
-void MqttTransport::clustermergeAndOutput(const std::vector<int>& targetIds)
+void MqttTransport::clustermergeAndOutput(const std::vector<int> &targetIds)
 {
     nlohmann::json merged;
     merged["head"]["packageSeq"] = 1;
@@ -1494,13 +1530,13 @@ void MqttTransport::clustermergeAndOutput(const std::vector<int>& targetIds)
         if (it == cluster_target_cache.end())
             continue;
 
-        const auto& cache = it->second;
+        const auto &cache = it->second;
         if (!(cache.has0 && cache.has1 && cache.has2))
             continue;
 
-        const auto& t0 = cache.part0;
-        const auto& t1 = cache.part1;
-        const auto& t2 = cache.part2;
+        const auto &t0 = cache.part0;
+        const auto &t1 = cache.part1;
+        const auto &t2 = cache.part2;
 
         nlohmann::json tgt;
         tgt["batch"] = id;
@@ -1528,7 +1564,7 @@ void MqttTransport::clustermergeAndOutput(const std::vector<int>& targetIds)
         tgt["MMSI"] = 0;
 
         targets.push_back(tgt);
-        cluster_target_cache.erase(it);  // 清除已处理的
+        cluster_target_cache.erase(it); // 清除已处理的
     }
 
     merged["content"]["count"] = targets.size();
@@ -1548,7 +1584,7 @@ void MqttTransport::cleanupExpiredClusterCaches()
     auto now = steady_clock::now();
     for (auto it = cluster_target_cache.begin(); it != cluster_target_cache.end();)
     {
-        if (duration_cast<seconds>(now - it->second.last_update).count() > 20)  // 超过30秒没更新
+        if (duration_cast<seconds>(now - it->second.last_update).count() > 20) // 超过30秒没更新
         {
             it = cluster_target_cache.erase(it);
         }
@@ -1559,6 +1595,8 @@ void MqttTransport::cleanupExpiredClusterCaches()
     }
 }
 
+// v1
+/*
 bool MqttTransport::isPointInPolygonXY(double x, double y,
                                        const std::vector<std::pair<double, double>>& polygonXY)
 {
@@ -1575,15 +1613,43 @@ bool MqttTransport::isPointInPolygonXY(double x, double y,
     }
     return inside;
 }
+*/
 
-bool MqttTransport::isPointInPolygonGeo(const Point& pt, const std::vector<Point>& polygon)
+// v2
+bool MqttTransport::isPointInPolygonXY(double x, double y, const std::vector<std::pair<double, double>> &polygonXY)
+{
+    bool inside = false;
+    int n = polygonXY.size();
+
+    if (n < 3)
+        return false; // 少于3点不是多边形
+
+    // 射线法判断
+    for (int i = 0, j = n - 1; i < n; j = i++)
+    {
+        double xi = polygonXY[i].first;
+        double yi = polygonXY[i].second;
+        double xj = polygonXY[j].first;
+        double yj = polygonXY[j].second;
+
+        // 判断射线是否穿过边
+        bool intersect = ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+
+        if (intersect)
+            inside = !inside;
+    }
+
+    return inside;
+}
+
+bool MqttTransport::isPointInPolygonGeo(const Point &pt, const std::vector<Point> &polygon)
 {
     // 以多边形第一个点为参考原点
     GeographicLib::LocalCartesian proj(polygon[0].lat, polygon[0].lon, 0);
 
     // 将多边形点转为局部平面坐标
     std::vector<std::pair<double, double>> polyXY;
-    for (const auto& p : polygon)
+    for (const auto &p : polygon)
     {
         double x, y, z;
         proj.Forward(p.lat, p.lon, 0, x, y, z);
@@ -1596,24 +1662,22 @@ bool MqttTransport::isPointInPolygonGeo(const Point& pt, const std::vector<Point
     return isPointInPolygonXY(px, py, polyXY);
 }
 
-bool MqttTransport::isInArea(const Point& pt)
+bool MqttTransport::isInArea(const Point &pt)
 {
-    for (const auto& [id, area] : areaMap)
+    for (const auto &[id, area] : areaMap)
     {
         if (area.polygon.empty())
             continue;
         if (isPointInPolygonGeo(pt, area.polygon))
         {
-            //std::cout << "[isInArea] point in area: " << id << std::endl;
+            // std::cout << "[isInArea] point in area: " << id << std::endl;
             return true;
         }
     }
     return false;
 }
 
-double MqttTransport::distancePointToSegment(double px, double py,
-                                              double x1, double y1,
-                                              double x2, double y2)
+double MqttTransport::distancePointToSegment(double px, double py, double x1, double y1, double x2, double y2)
 {
     double dx = x2 - x1;
     double dy = y2 - y1;
@@ -1627,6 +1691,8 @@ double MqttTransport::distancePointToSegment(double px, double py,
     return std::hypot(px - projX, py - projY);
 }
 
+// v1
+/*
 bool MqttTransport::isPointInPolygonGeoBuffered(const Point& pt,
                                                  const std::vector<Point>& polygon,
                                                  double toleranceMeters)
@@ -1664,7 +1730,42 @@ bool MqttTransport::isPointInPolygonGeoBuffered(const Point& pt,
 
     return minDist <= toleranceMeters;
 }
+*/
 
+// v2
+bool MqttTransport::isPointInPolygonGeoBuffered(const Point &pt, const Area &area, double toleranceMeters)
+{
+    if (area.polygonXY.empty())
+        return false;
+
+    double px, py, pz;
+    area.proj.Forward(pt.lat, pt.lon, 0, px, py, pz);
+
+    // 如果点在多边形内，直接返回
+    if (isPointInPolygonXY(px, py, area.polygonXY))
+        return true;
+
+    // 否则计算到多边形边的最小距离
+    double minDist = std::numeric_limits<double>::max();
+    int n = area.polygonXY.size();
+    for (int i = 0; i < n; ++i)
+    {
+        const auto &p1 = area.polygonXY[i];
+        const auto &p2 = area.polygonXY[(i + 1) % n];
+        double dist = distancePointToSegment(px, py, p1.first, p1.second, p2.first, p2.second);
+
+        if (dist < minDist)
+            minDist = dist;
+
+        // 提前退出
+        if (minDist <= toleranceMeters)
+            return true;
+    }
+
+    return minDist <= toleranceMeters;
+}
+
+/*
 bool MqttTransport::isInAreaBuffered(const Point& pt, double toleranceMeters)
 {
     for (const auto& [id, area] : areaMap)
@@ -1678,4 +1779,99 @@ bool MqttTransport::isInAreaBuffered(const Point& pt, double toleranceMeters)
         }
     }
     return false;
+}*/
+
+/*
+bool MqttTransport::isInAreaBuffered(const Point& pt, double toleranceMeters)
+{
+    for (const auto& [id, area] : areaMap)
+    {
+        if (area.polygon.empty())
+            continue;
+
+        // 包围盒粗过滤
+        if (pt.lat < area.minLat - 0.001 || pt.lat > area.maxLat + 0.001 ||
+            pt.lon < area.minLon - 0.001 || pt.lon > area.maxLon + 0.001)
+            continue;
+
+        // 投影点
+        double px, py, pz;
+        area.proj.Forward(pt.lat, pt.lon, 0, px, py, pz);
+
+        // 在多边形内
+        if (isPointInPolygonXY(px, py, area.polygonXY))
+            return true;
+
+        // 检查边的最小距离
+        double minDist = std::numeric_limits<double>::max();
+        int n = area.polygonXY.size();
+        for (int i = 0; i < n; ++i)
+        {
+            const auto& p1 = area.polygonXY[i];
+            const auto& p2 = area.polygonXY[(i + 1) % n];
+            double dist = distancePointToSegment(px, py, p1.first, p1.second, p2.first, p2.second);
+            if (dist < minDist)
+                minDist = dist;
+        }
+
+        if (minDist <= toleranceMeters)
+            return true;
+    }
+    return false;
+}
+*/
+
+// v2
+bool MqttTransport::isInAreaBuffered(const Point &pt, double toleranceMeters)
+{
+    // 经纬度缓冲值（米转度）
+    double latTol = toleranceMeters / 111000.0;
+    double lonTol = toleranceMeters / (111000.0 * cos(pt.lat * M_PI / 180.0));
+
+    for (const auto &[id, area] : areaMap)
+    {
+        if (area.polygon.empty())
+            continue;
+
+        // 包围盒快速过滤
+        if (pt.lat < area.minLat - latTol || pt.lat > area.maxLat + latTol || pt.lon < area.minLon - lonTol ||
+            pt.lon > area.maxLon + lonTol)
+            continue;
+
+        if (isPointInPolygonGeoBuffered(pt, area, toleranceMeters))
+            return true;
+    }
+    return false;
+}
+
+void MqttTransport::prepareAreaCache()
+{
+    for (auto &[id, area] : areaMap)
+    {
+        if (area.polygon.empty())
+            continue;
+
+        // 计算包围盒
+        area.minLat = area.maxLat = area.polygon[0].lat;
+        area.minLon = area.maxLon = area.polygon[0].lon;
+        for (auto &p : area.polygon)
+        {
+            area.minLat = std::min(area.minLat, p.lat);
+            area.maxLat = std::max(area.maxLat, p.lat);
+            area.minLon = std::min(area.minLon, p.lon);
+            area.maxLon = std::max(area.maxLon, p.lon);
+        }
+
+        // 初始化投影
+        area.proj.Reset(area.polygon[0].lat, area.polygon[0].lon, 0);
+
+        // 缓存局部坐标
+        area.polygonXY.clear();
+        for (auto &p : area.polygon)
+        {
+            double x, y, z;
+            area.proj.Forward(p.lat, p.lon, 0, x, y, z);
+            area.polygonXY.emplace_back(x, y);
+        }
+    }
 }

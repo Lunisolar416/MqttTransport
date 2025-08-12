@@ -3,6 +3,7 @@
 
 #include "GeoUtils.h"
 #include "protocal.h"
+#include <GeographicLib/LocalCartesian.hpp>
 #include <cstdint>
 #include <functional>
 #include <mqtt/async_client.h>
@@ -49,6 +50,14 @@ struct Area
     int areasFuncId;
     int polygonNumber;
     std::vector<Point> polygon;
+
+    std::vector<std::pair<double, double>> polygonXY;
+    GeographicLib::LocalCartesian proj;
+    double minLat, maxLat, minLon, maxLon;
+
+    Area() : proj(0, 0, 0), minLat(0), maxLat(0), minLon(0), maxLon(0)
+    {
+    }
 };
 // 这个类就作为订阅者和发布者
 // 订阅外部消息，再该类中转化成新的协议并发到usfs的brige的mqttsubscriber中
@@ -130,8 +139,12 @@ class MqttTransport : public virtual mqtt::callback, public virtual mqtt::iactio
     bool isPointInPolygonGeo(const Point &pt, const std::vector<Point> &polygon);
     bool isInArea(const Point &pt);
     double distancePointToSegment(double px, double py, double x1, double y1, double x2, double y2);
-    bool isPointInPolygonGeoBuffered(const Point &pt, const std::vector<Point> &polygon, double toleranceMeters);
+    // bool isPointInPolygonGeoBuffered(const Point& pt,const std::vector<Point>& polygon,double toleranceMeters);
+    bool isPointInPolygonGeoBuffered(const Point &pt, const Area &area, double toleranceMeters);
+
     bool isInAreaBuffered(const Point &pt, double toleranceMeters);
+
+    void prepareAreaCache();
 
   private:
     // subscribe to receive outenv data
