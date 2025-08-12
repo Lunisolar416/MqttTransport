@@ -114,9 +114,6 @@ class MqttTransport : public virtual mqtt::callback, public virtual mqtt::iactio
     // 清理过期或者不完整的融合
     void cleanupExpiredCaches();
 
-    // save result
-    void saveMergedJsonToFile(const nlohmann::json &merged, const std::string &filename);
-
     // 集群融合
     void handle_0220H0(const nlohmann::json &json_msg, const std::string &topic);
     void handle_0220H1(const nlohmann::json &json_msg, const std::string &topic);
@@ -132,6 +129,9 @@ class MqttTransport : public virtual mqtt::callback, public virtual mqtt::iactio
     bool isPointInPolygonXY(double x, double y, const std::vector<std::pair<double, double>> &polygonXY);
     bool isPointInPolygonGeo(const Point &pt, const std::vector<Point> &polygon);
     bool isInArea(const Point &pt);
+    double distancePointToSegment(double px, double py, double x1, double y1, double x2, double y2);
+    bool isPointInPolygonGeoBuffered(const Point &pt, const std::vector<Point> &polygon, double toleranceMeters);
+    bool isInAreaBuffered(const Point &pt, double toleranceMeters);
 
   private:
     // subscribe to receive outenv data
