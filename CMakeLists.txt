@@ -10,7 +10,7 @@ set(SOURCES
     main.cc
     MqttTransport.cc
     protocal.cc
-    polygonPoint.cc
+    polygon_point_singleton.cc
 )
 
 # 生成可执行文件

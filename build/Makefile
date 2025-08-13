@@ -201,29 +201,29 @@ main.cc.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/MqttTransport.dir/build.make CMakeFiles/MqttTransport.dir/main.cc.s
 .PHONY : main.cc.s
 
-polygonPoint.o: polygonPoint.cc.o
-.PHONY : polygonPoint.o
+polygon_point_singleton.o: polygon_point_singleton.cc.o
+.PHONY : polygon_point_singleton.o
 
 # target to build an object file
-polygonPoint.cc.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/MqttTransport.dir/build.make CMakeFiles/MqttTransport.dir/polygonPoint.cc.o
-.PHONY : polygonPoint.cc.o
+polygon_point_singleton.cc.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MqttTransport.dir/build.make CMakeFiles/MqttTransport.dir/polygon_point_singleton.cc.o
+.PHONY : polygon_point_singleton.cc.o
 
-polygonPoint.i: polygonPoint.cc.i
-.PHONY : polygonPoint.i
+polygon_point_singleton.i: polygon_point_singleton.cc.i
+.PHONY : polygon_point_singleton.i
 
 # target to preprocess a source file
-polygonPoint.cc.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/MqttTransport.dir/build.make CMakeFiles/MqttTransport.dir/polygonPoint.cc.i
-.PHONY : polygonPoint.cc.i
+polygon_point_singleton.cc.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MqttTransport.dir/build.make CMakeFiles/MqttTransport.dir/polygon_point_singleton.cc.i
+.PHONY : polygon_point_singleton.cc.i
 
-polygonPoint.s: polygonPoint.cc.s
-.PHONY : polygonPoint.s
+polygon_point_singleton.s: polygon_point_singleton.cc.s
+.PHONY : polygon_point_singleton.s
 
 # target to generate assembly for a file
-polygonPoint.cc.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/MqttTransport.dir/build.make CMakeFiles/MqttTransport.dir/polygonPoint.cc.s
-.PHONY : polygonPoint.cc.s
+polygon_point_singleton.cc.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MqttTransport.dir/build.make CMakeFiles/MqttTransport.dir/polygon_point_singleton.cc.s
+.PHONY : polygon_point_singleton.cc.s
 
 protocal.o: protocal.cc.o
 .PHONY : protocal.o
@@ -267,9 +267,9 @@ help:
 	@echo "... main.o"
 	@echo "... main.i"
 	@echo "... main.s"
-	@echo "... polygonPoint.o"
-	@echo "... polygonPoint.i"
-	@echo "... polygonPoint.s"
+	@echo "... polygon_point_singleton.o"
+	@echo "... polygon_point_singleton.i"
+	@echo "... polygon_point_singleton.s"
 	@echo "... protocal.o"
 	@echo "... protocal.i"
 	@echo "... protocal.s"

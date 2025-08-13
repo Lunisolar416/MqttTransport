@@ -11,7 +11,7 @@ set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/home/ubuntu/cpp/src/GeoUtils.cc" "CMakeFiles/MqttTransport.dir/GeoUtils.cc.o" "gcc" "CMakeFiles/MqttTransport.dir/GeoUtils.cc.o.d"
   "/home/ubuntu/cpp/src/MqttTransport.cc" "CMakeFiles/MqttTransport.dir/MqttTransport.cc.o" "gcc" "CMakeFiles/MqttTransport.dir/MqttTransport.cc.o.d"
   "/home/ubuntu/cpp/src/main.cc" "CMakeFiles/MqttTransport.dir/main.cc.o" "gcc" "CMakeFiles/MqttTransport.dir/main.cc.o.d"
-  "/home/ubuntu/cpp/src/polygonPoint.cc" "CMakeFiles/MqttTransport.dir/polygonPoint.cc.o" "gcc" "CMakeFiles/MqttTransport.dir/polygonPoint.cc.o.d"
+  "/home/ubuntu/cpp/src/polygon_point_singleton.cc" "CMakeFiles/MqttTransport.dir/polygon_point_singleton.cc.o" "gcc" "CMakeFiles/MqttTransport.dir/polygon_point_singleton.cc.o.d"
   "/home/ubuntu/cpp/src/protocal.cc" "CMakeFiles/MqttTransport.dir/protocal.cc.o" "gcc" "CMakeFiles/MqttTransport.dir/protocal.cc.o.d"
   )
 

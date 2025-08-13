@@ -125,19 +125,19 @@ CMakeFiles/MqttTransport.dir/protocal.cc.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/MqttTransport.dir/protocal.cc.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ubuntu/cpp/src/protocal.cc -o CMakeFiles/MqttTransport.dir/protocal.cc.s
 
-CMakeFiles/MqttTransport.dir/polygonPoint.cc.o: CMakeFiles/MqttTransport.dir/flags.make
-CMakeFiles/MqttTransport.dir/polygonPoint.cc.o: /home/ubuntu/cpp/src/polygonPoint.cc
-CMakeFiles/MqttTransport.dir/polygonPoint.cc.o: CMakeFiles/MqttTransport.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ubuntu/cpp/src/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object CMakeFiles/MqttTransport.dir/polygonPoint.cc.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/MqttTransport.dir/polygonPoint.cc.o -MF CMakeFiles/MqttTransport.dir/polygonPoint.cc.o.d -o CMakeFiles/MqttTransport.dir/polygonPoint.cc.o -c /home/ubuntu/cpp/src/polygonPoint.cc
+CMakeFiles/MqttTransport.dir/polygon_point_singleton.cc.o: CMakeFiles/MqttTransport.dir/flags.make
+CMakeFiles/MqttTransport.dir/polygon_point_singleton.cc.o: /home/ubuntu/cpp/src/polygon_point_singleton.cc
+CMakeFiles/MqttTransport.dir/polygon_point_singleton.cc.o: CMakeFiles/MqttTransport.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ubuntu/cpp/src/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object CMakeFiles/MqttTransport.dir/polygon_point_singleton.cc.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/MqttTransport.dir/polygon_point_singleton.cc.o -MF CMakeFiles/MqttTransport.dir/polygon_point_singleton.cc.o.d -o CMakeFiles/MqttTransport.dir/polygon_point_singleton.cc.o -c /home/ubuntu/cpp/src/polygon_point_singleton.cc
 
-CMakeFiles/MqttTransport.dir/polygonPoint.cc.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/MqttTransport.dir/polygonPoint.cc.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ubuntu/cpp/src/polygonPoint.cc > CMakeFiles/MqttTransport.dir/polygonPoint.cc.i
+CMakeFiles/MqttTransport.dir/polygon_point_singleton.cc.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/MqttTransport.dir/polygon_point_singleton.cc.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ubuntu/cpp/src/polygon_point_singleton.cc > CMakeFiles/MqttTransport.dir/polygon_point_singleton.cc.i
 
-CMakeFiles/MqttTransport.dir/polygonPoint.cc.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/MqttTransport.dir/polygonPoint.cc.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ubuntu/cpp/src/polygonPoint.cc -o CMakeFiles/MqttTransport.dir/polygonPoint.cc.s
+CMakeFiles/MqttTransport.dir/polygon_point_singleton.cc.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/MqttTransport.dir/polygon_point_singleton.cc.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ubuntu/cpp/src/polygon_point_singleton.cc -o CMakeFiles/MqttTransport.dir/polygon_point_singleton.cc.s
 
 # Object files for target MqttTransport
 MqttTransport_OBJECTS = \
@@ -145,7 +145,7 @@ MqttTransport_OBJECTS = \
 "CMakeFiles/MqttTransport.dir/main.cc.o" \
 "CMakeFiles/MqttTransport.dir/MqttTransport.cc.o" \
 "CMakeFiles/MqttTransport.dir/protocal.cc.o" \
-"CMakeFiles/MqttTransport.dir/polygonPoint.cc.o"
+"CMakeFiles/MqttTransport.dir/polygon_point_singleton.cc.o"
 
 # External object files for target MqttTransport
 MqttTransport_EXTERNAL_OBJECTS =
@@ -154,7 +154,7 @@ MqttTransport: CMakeFiles/MqttTransport.dir/GeoUtils.cc.o
 MqttTransport: CMakeFiles/MqttTransport.dir/main.cc.o
 MqttTransport: CMakeFiles/MqttTransport.dir/MqttTransport.cc.o
 MqttTransport: CMakeFiles/MqttTransport.dir/protocal.cc.o
-MqttTransport: CMakeFiles/MqttTransport.dir/polygonPoint.cc.o
+MqttTransport: CMakeFiles/MqttTransport.dir/polygon_point_singleton.cc.o
 MqttTransport: CMakeFiles/MqttTransport.dir/build.make
 MqttTransport: CMakeFiles/MqttTransport.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/ubuntu/cpp/src/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Linking CXX executable MqttTransport"

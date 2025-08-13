@@ -1,5 +1,5 @@
 #include "MqttTransport.h"
-#include "polygonPoint.h"
+#include "polygon_point_singleton.h"
 #include "protocal.h"
 #include <GeographicLib/LocalCartesian.hpp>
 #include <exception>
@@ -1148,6 +1148,8 @@ void MqttTransport::mergeAndOutput(const std::vector<int> &targetIds)
         Eigen::Vector2d point(longitude, latitude);
 
         bool isinside = POLYGON_TESTER->isPointInPolygon(point);
+        std::cout << "Boat " << point.transpose() << (isinside ? " is inside the polygon." : " is outside the polygon.")
+                  << std::endl;
         if (!isinside && !is_simple_waterarea)
         {
             std::cout << "Target " << id << " is outside the polygon." << std::endl;
@@ -1178,9 +1180,9 @@ void MqttTransport::mergeAndOutput(const std::vector<int> &targetIds)
         if (sign == 3)
             sign = 0;
         tgt["sign"] = 0;
-        // tgt["shipLength"] = t0.value("targetEdgeLength", 0.0);
-        // tgt["shipWidth"] = t0.value("targetEdgeWidth", 0.0);
-        // tgt["shipHeight"] = t0.value("targetHeight", 0.0);
+        tgt["shipLength"] = t0.value("targetEdgeLength", 0.0);
+        tgt["shipWidth"] = t0.value("targetEdgeWidth", 0.0);
+        tgt["shipHeight"] = t0.value("targetHeight", 0.0);
         uint8_t type = t1.value("targetType", 0);
         if (type == 4 || type == 5 || type == 6 || type == 7 || type == 8 || type == 9 || type == 10 || type == 11)
             type = 1;
