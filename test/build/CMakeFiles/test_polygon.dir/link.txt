@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/test_polygon.dir/example.cc.o CMakeFiles/test_polygon.dir/polygon_point_singleton.cc.o -o test_polygon  -lpaho-mqttpp3 -lpaho-mqtt3as -lpthread 

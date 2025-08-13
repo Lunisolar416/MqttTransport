@@ -5,6 +5,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/MqttTransport.dir/MqttTransport.cc.o.d"
   "CMakeFiles/MqttTransport.dir/main.cc.o"
   "CMakeFiles/MqttTransport.dir/main.cc.o.d"
+  "CMakeFiles/MqttTransport.dir/polygonPoint.cc.o"
+  "CMakeFiles/MqttTransport.dir/polygonPoint.cc.o.d"
   "CMakeFiles/MqttTransport.dir/protocal.cc.o"
   "CMakeFiles/MqttTransport.dir/protocal.cc.o.d"
   "MqttTransport"

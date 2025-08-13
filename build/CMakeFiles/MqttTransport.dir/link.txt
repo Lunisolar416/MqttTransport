@@ -1,1 +1,1 @@
-/usr/bin/c++ CMakeFiles/MqttTransport.dir/GeoUtils.cc.o CMakeFiles/MqttTransport.dir/main.cc.o CMakeFiles/MqttTransport.dir/MqttTransport.cc.o CMakeFiles/MqttTransport.dir/protocal.cc.o -o MqttTransport  -lpaho-mqttpp3 -lpaho-mqtt3as -lyaml-cpp -lpthread 
+/usr/bin/c++ CMakeFiles/MqttTransport.dir/GeoUtils.cc.o CMakeFiles/MqttTransport.dir/main.cc.o CMakeFiles/MqttTransport.dir/MqttTransport.cc.o CMakeFiles/MqttTransport.dir/protocal.cc.o CMakeFiles/MqttTransport.dir/polygonPoint.cc.o -o MqttTransport  -lpaho-mqttpp3 -lpaho-mqtt3as -lyaml-cpp -lpthread 

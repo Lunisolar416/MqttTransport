@@ -4,7 +4,7 @@
 # compile CXX with /usr/bin/c++
 CXX_DEFINES = 
 
-CXX_INCLUDES = 
+CXX_INCLUDES = -I/home/ubuntu/cpp/src -isystem /usr/include/eigen3
 
 CXX_FLAGS = -std=gnu++17
 

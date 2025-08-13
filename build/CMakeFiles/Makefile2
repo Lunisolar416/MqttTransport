@@ -81,12 +81,12 @@ clean: CMakeFiles/MqttTransport.dir/clean
 CMakeFiles/MqttTransport.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/MqttTransport.dir/build.make CMakeFiles/MqttTransport.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/MqttTransport.dir/build.make CMakeFiles/MqttTransport.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/ubuntu/cpp/src/build/CMakeFiles --progress-num=1,2,3,4,5 "Built target MqttTransport"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/ubuntu/cpp/src/build/CMakeFiles --progress-num=1,2,3,4,5,6 "Built target MqttTransport"
 .PHONY : CMakeFiles/MqttTransport.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/MqttTransport.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/ubuntu/cpp/src/build/CMakeFiles 5
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/ubuntu/cpp/src/build/CMakeFiles 6
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/MqttTransport.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/ubuntu/cpp/src/build/CMakeFiles 0
 .PHONY : CMakeFiles/MqttTransport.dir/rule

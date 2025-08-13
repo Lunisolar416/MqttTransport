@@ -201,6 +201,30 @@ main.cc.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/MqttTransport.dir/build.make CMakeFiles/MqttTransport.dir/main.cc.s
 .PHONY : main.cc.s
 
+polygonPoint.o: polygonPoint.cc.o
+.PHONY : polygonPoint.o
+
+# target to build an object file
+polygonPoint.cc.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MqttTransport.dir/build.make CMakeFiles/MqttTransport.dir/polygonPoint.cc.o
+.PHONY : polygonPoint.cc.o
+
+polygonPoint.i: polygonPoint.cc.i
+.PHONY : polygonPoint.i
+
+# target to preprocess a source file
+polygonPoint.cc.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MqttTransport.dir/build.make CMakeFiles/MqttTransport.dir/polygonPoint.cc.i
+.PHONY : polygonPoint.cc.i
+
+polygonPoint.s: polygonPoint.cc.s
+.PHONY : polygonPoint.s
+
+# target to generate assembly for a file
+polygonPoint.cc.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MqttTransport.dir/build.make CMakeFiles/MqttTransport.dir/polygonPoint.cc.s
+.PHONY : polygonPoint.cc.s
+
 protocal.o: protocal.cc.o
 .PHONY : protocal.o
 
@@ -243,6 +267,9 @@ help:
 	@echo "... main.o"
 	@echo "... main.i"
 	@echo "... main.s"
+	@echo "... polygonPoint.o"
+	@echo "... polygonPoint.i"
+	@echo "... polygonPoint.s"
 	@echo "... protocal.o"
 	@echo "... protocal.i"
 	@echo "... protocal.s"

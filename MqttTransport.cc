@@ -1,4 +1,5 @@
 #include "MqttTransport.h"
+#include "polygonPoint.h"
 #include "protocal.h"
 #include <GeographicLib/LocalCartesian.hpp>
 #include <exception>
@@ -304,82 +305,55 @@ void MqttTransport::handle_0042(const nlohmann::json& json_msg, const std::strin
 area.polygon.size() << "\n";
 }*/
 
-// v2
 void MqttTransport::handle_0042(const nlohmann::json &json_msg, const std::string &topic)
 {
-    if (!json_msg.is_array() || json_msg.empty())
+    std::vector<Eigen::Vector2d> polygon_lonlat;
+    // 校验 content 和 polygon 是否存在且类型正确
+    if (!json_msg.contains("content") || !json_msg["content"].is_object())
     {
-        std::cerr << "handle_0042: json_msg is not array or empty\n";
+        std::cerr << "handle_0042: missing or invalid content\n";
         return;
     }
 
-    const auto &area_obj = json_msg[0];
-    if (!area_obj.contains("areasFuncId") || !area_obj.contains("polygonNumber") || !area_obj.contains("polygon"))
+    const auto &content = json_msg["content"];
+
+    if (!content.contains("polygon") || !content["polygon"].is_array())
     {
-        std::cerr << "handle_0042: missing required fields\n";
+        std::cerr << "handle_0042: missing or invalid polygon array\n";
         return;
     }
 
-    Area area;
-    area.areasFuncId = area_obj["areasFuncId"].get<int>();
-    area.polygonNumber = area_obj["polygonNumber"].get<int>();
-    area.polygon.clear();
-
-    const auto &polygon_json = area_obj["polygon"];
-    if (!polygon_json.is_array())
+    for (const auto &point : content["polygon"])
     {
-        std::cerr << "handle_0042: polygon field not array\n";
-        return;
-    }
-
-    double minLat = std::numeric_limits<double>::max();
-    double maxLat = std::numeric_limits<double>::lowest();
-    double minLon = std::numeric_limits<double>::max();
-    double maxLon = std::numeric_limits<double>::lowest();
-
-    for (const auto &pt_json : polygon_json)
-    {
-        if (pt_json.contains("areaPointsLatitude") && pt_json.contains("areaPointsLongitude"))
+        if (!point.contains("areaLatitude") || !point.contains("areaLongitude"))
         {
-            double lat = pt_json["areaPointsLatitude"].get<double>();
-            double lon = pt_json["areaPointsLongitude"].get<double>();
-
-            area.polygon.push_back({lat, lon});
-
-            // 更新包围盒
-            minLat = std::min(minLat, lat);
-            maxLat = std::max(maxLat, lat);
-            minLon = std::min(minLon, lon);
-            maxLon = std::max(maxLon, lon);
+            std::cerr << "handle_0042: polygon point missing lat or lon\n";
+            continue;
         }
+
+        double lat = point["areaLatitude"].get<double>();
+        double lon = point["areaLongitude"].get<double>();
+
+        polygon_lonlat.emplace_back(lon, lat);
     }
 
-    if ((int)area.polygon.size() != area.polygonNumber)
-        std::cerr << "handle_0042: Warning polygonNumber mismatch\n";
-
-    // 初始化 LocalCartesian 投影
-    if (!area.polygon.empty())
+    if (!POLYGON_TESTER->LoadPolygon(polygon_lonlat))
     {
-        area.proj.Reset(area.polygon[0].lat, area.polygon[0].lon, 0);
-
-        // 预计算投影坐标
-        area.polygonXY.clear();
-        area.polygonXY.reserve(area.polygon.size());
-        for (const auto &p : area.polygon)
-        {
-            double x, y, z;
-            area.proj.Forward(p.lat, p.lon, 0, x, y, z);
-            area.polygonXY.emplace_back(x, y);
-        }
+        std::cerr << "Failed to load polygon\n";
+        return;
     }
 
-    area.minLat = minLat;
-    area.maxLat = maxLat;
-    area.minLon = minLon;
-    area.maxLon = maxLon;
+    int polygonCount = 0;
+    if (content.contains("polygonCount") && content["polygonCount"].is_number_integer())
+    {
+        polygonCount = content["polygonCount"].get<int>();
+    }
 
-    // 存入容器
-    areaMap[area.areasFuncId] = area;
+    int type = 0;
+    if (content.contains("type") && content["type"].is_number_integer())
+    {
+        type = content["type"].get<int>();
+    }
 }
 
 // 组件协议
@@ -1170,15 +1144,16 @@ void MqttTransport::mergeAndOutput(const std::vector<int> &targetIds)
         tgt["latitude"] = t0.value("targetLatitude", 0.0);
         double longitude = tgt["longitude"];
         double latitude = tgt["latitude"];
-        /*
-        Point point(latitude,longitude);
-        if (!isInAreaBuffered(point,1) && !is_simple_waterarea )
+
+        Eigen::Vector2d point(longitude, latitude);
+
+        bool isinside = POLYGON_TESTER->isPointInPolygon(point);
+        if (!isinside && !is_simple_waterarea)
         {
-            //std::cout<<"out of range"<<std::endl;
+            std::cout << "Target " << id << " is outside the polygon." << std::endl;
             target_cache.erase(it);
-            continue;
+            continue; // 如果目标不在多边形内，则跳过
         }
-        */
 
         double distance = GeoUtils::computeDistance(self_longitude_, self_latitude_, longitude, latitude);
         // std::cout << "距离: " << distance << " 米" << std::endl;
@@ -1595,283 +1570,283 @@ void MqttTransport::cleanupExpiredClusterCaches()
     }
 }
 
-// v1
-/*
-bool MqttTransport::isPointInPolygonXY(double x, double y,
-                                       const std::vector<std::pair<double, double>>& polygonXY)
-{
-    bool inside = false;
-    int n = polygonXY.size();
-    for (int i = 0, j = n - 1; i < n; j = i++)
-    {
-        double xi = polygonXY[i].first, yi = polygonXY[i].second;
-        double xj = polygonXY[j].first, yj = polygonXY[j].second;
+// // v1
+// /*
+// bool MqttTransport::isPointInPolygonXY(double x, double y,
+//                                        const std::vector<std::pair<double, double>>& polygonXY)
+// {
+//     bool inside = false;
+//     int n = polygonXY.size();
+//     for (int i = 0, j = n - 1; i < n; j = i++)
+//     {
+//         double xi = polygonXY[i].first, yi = polygonXY[i].second;
+//         double xj = polygonXY[j].first, yj = polygonXY[j].second;
 
-        bool intersect = ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-        if (intersect)
-            inside = !inside;
-    }
-    return inside;
-}
-*/
+//         bool intersect = ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+//         if (intersect)
+//             inside = !inside;
+//     }
+//     return inside;
+// }
+// */
 
-// v2
-bool MqttTransport::isPointInPolygonXY(double x, double y, const std::vector<std::pair<double, double>> &polygonXY)
-{
-    bool inside = false;
-    int n = polygonXY.size();
+// // v2
+// bool MqttTransport::isPointInPolygonXY(double x, double y, const std::vector<std::pair<double, double>> &polygonXY)
+// {
+//     bool inside = false;
+//     int n = polygonXY.size();
 
-    if (n < 3)
-        return false; // 少于3点不是多边形
+//     if (n < 3)
+//         return false; // 少于3点不是多边形
 
-    // 射线法判断
-    for (int i = 0, j = n - 1; i < n; j = i++)
-    {
-        double xi = polygonXY[i].first;
-        double yi = polygonXY[i].second;
-        double xj = polygonXY[j].first;
-        double yj = polygonXY[j].second;
+//     // 射线法判断
+//     for (int i = 0, j = n - 1; i < n; j = i++)
+//     {
+//         double xi = polygonXY[i].first;
+//         double yi = polygonXY[i].second;
+//         double xj = polygonXY[j].first;
+//         double yj = polygonXY[j].second;
 
-        // 判断射线是否穿过边
-        bool intersect = ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+//         // 判断射线是否穿过边
+//         bool intersect = ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
 
-        if (intersect)
-            inside = !inside;
-    }
+//         if (intersect)
+//             inside = !inside;
+//     }
 
-    return inside;
-}
+//     return inside;
+// }
 
-bool MqttTransport::isPointInPolygonGeo(const Point &pt, const std::vector<Point> &polygon)
-{
-    // 以多边形第一个点为参考原点
-    GeographicLib::LocalCartesian proj(polygon[0].lat, polygon[0].lon, 0);
+// bool MqttTransport::isPointInPolygonGeo(const Point &pt, const std::vector<Point> &polygon)
+// {
+//     // 以多边形第一个点为参考原点
+//     GeographicLib::LocalCartesian proj(polygon[0].lat, polygon[0].lon, 0);
 
-    // 将多边形点转为局部平面坐标
-    std::vector<std::pair<double, double>> polyXY;
-    for (const auto &p : polygon)
-    {
-        double x, y, z;
-        proj.Forward(p.lat, p.lon, 0, x, y, z);
-        polyXY.emplace_back(x, y);
-    }
+//     // 将多边形点转为局部平面坐标
+//     std::vector<std::pair<double, double>> polyXY;
+//     for (const auto &p : polygon)
+//     {
+//         double x, y, z;
+//         proj.Forward(p.lat, p.lon, 0, x, y, z);
+//         polyXY.emplace_back(x, y);
+//     }
 
-    double px, py, pz;
-    proj.Forward(pt.lat, pt.lon, 0, px, py, pz);
+//     double px, py, pz;
+//     proj.Forward(pt.lat, pt.lon, 0, px, py, pz);
 
-    return isPointInPolygonXY(px, py, polyXY);
-}
+//     return isPointInPolygonXY(px, py, polyXY);
+// }
 
-bool MqttTransport::isInArea(const Point &pt)
-{
-    for (const auto &[id, area] : areaMap)
-    {
-        if (area.polygon.empty())
-            continue;
-        if (isPointInPolygonGeo(pt, area.polygon))
-        {
-            // std::cout << "[isInArea] point in area: " << id << std::endl;
-            return true;
-        }
-    }
-    return false;
-}
+// bool MqttTransport::isInArea(const Point &pt)
+// {
+//     for (const auto &[id, area] : areaMap)
+//     {
+//         if (area.polygon.empty())
+//             continue;
+//         if (isPointInPolygonGeo(pt, area.polygon))
+//         {
+//             // std::cout << "[isInArea] point in area: " << id << std::endl;
+//             return true;
+//         }
+//     }
+//     return false;
+// }
 
-double MqttTransport::distancePointToSegment(double px, double py, double x1, double y1, double x2, double y2)
-{
-    double dx = x2 - x1;
-    double dy = y2 - y1;
-    if (dx == 0 && dy == 0)
-        return std::hypot(px - x1, py - y1);
+// double MqttTransport::distancePointToSegment(double px, double py, double x1, double y1, double x2, double y2)
+// {
+//     double dx = x2 - x1;
+//     double dy = y2 - y1;
+//     if (dx == 0 && dy == 0)
+//         return std::hypot(px - x1, py - y1);
 
-    double t = ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy);
-    t = std::max(0.0, std::min(1.0, t));
-    double projX = x1 + t * dx;
-    double projY = y1 + t * dy;
-    return std::hypot(px - projX, py - projY);
-}
+//     double t = ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy);
+//     t = std::max(0.0, std::min(1.0, t));
+//     double projX = x1 + t * dx;
+//     double projY = y1 + t * dy;
+//     return std::hypot(px - projX, py - projY);
+// }
 
-// v1
-/*
-bool MqttTransport::isPointInPolygonGeoBuffered(const Point& pt,
-                                                 const std::vector<Point>& polygon,
-                                                 double toleranceMeters)
-{
-    if (polygon.empty())
-        return false;
+// // v1
+// /*
+// bool MqttTransport::isPointInPolygonGeoBuffered(const Point& pt,
+//                                                  const std::vector<Point>& polygon,
+//                                                  double toleranceMeters)
+// {
+//     if (polygon.empty())
+//         return false;
 
-    // 投影到局部平面坐标
-    GeographicLib::LocalCartesian proj(polygon[0].lat, polygon[0].lon, 0);
-    std::vector<std::pair<double, double>> polyXY;
-    for (const auto& p : polygon)
-    {
-        double x, y, z;
-        proj.Forward(p.lat, p.lon, 0, x, y, z);
-        polyXY.emplace_back(x, y);
-    }
+//     // 投影到局部平面坐标
+//     GeographicLib::LocalCartesian proj(polygon[0].lat, polygon[0].lon, 0);
+//     std::vector<std::pair<double, double>> polyXY;
+//     for (const auto& p : polygon)
+//     {
+//         double x, y, z;
+//         proj.Forward(p.lat, p.lon, 0, x, y, z);
+//         polyXY.emplace_back(x, y);
+//     }
 
-    double px, py, pz;
-    proj.Forward(pt.lat, pt.lon, 0, px, py, pz);
+//     double px, py, pz;
+//     proj.Forward(pt.lat, pt.lon, 0, px, py, pz);
 
-    // 如果点在多边形内，直接返回 true
-    if (isPointInPolygonXY(px, py, polyXY))
-        return true;
+//     // 如果点在多边形内，直接返回 true
+//     if (isPointInPolygonXY(px, py, polyXY))
+//         return true;
 
-    // 否则计算到多边形边的最小距离
-    double minDist = std::numeric_limits<double>::max();
-    int n = polyXY.size();
-    for (int i = 0; i < n; ++i)
-    {
-        const auto& p1 = polyXY[i];
-        const auto& p2 = polyXY[(i + 1) % n];
-        double dist = distancePointToSegment(px, py, p1.first, p1.second, p2.first, p2.second);
-        minDist = std::min(minDist, dist);
-    }
+//     // 否则计算到多边形边的最小距离
+//     double minDist = std::numeric_limits<double>::max();
+//     int n = polyXY.size();
+//     for (int i = 0; i < n; ++i)
+//     {
+//         const auto& p1 = polyXY[i];
+//         const auto& p2 = polyXY[(i + 1) % n];
+//         double dist = distancePointToSegment(px, py, p1.first, p1.second, p2.first, p2.second);
+//         minDist = std::min(minDist, dist);
+//     }
 
-    return minDist <= toleranceMeters;
-}
-*/
+//     return minDist <= toleranceMeters;
+// }
+// */
 
-// v2
-bool MqttTransport::isPointInPolygonGeoBuffered(const Point &pt, const Area &area, double toleranceMeters)
-{
-    if (area.polygonXY.empty())
-        return false;
+// // v2
+// bool MqttTransport::isPointInPolygonGeoBuffered(const Point &pt, const Area &area, double toleranceMeters)
+// {
+//     if (area.polygonXY.empty())
+//         return false;
 
-    double px, py, pz;
-    area.proj.Forward(pt.lat, pt.lon, 0, px, py, pz);
+//     double px, py, pz;
+//     area.proj.Forward(pt.lat, pt.lon, 0, px, py, pz);
 
-    // 如果点在多边形内，直接返回
-    if (isPointInPolygonXY(px, py, area.polygonXY))
-        return true;
+//     // 如果点在多边形内，直接返回
+//     if (isPointInPolygonXY(px, py, area.polygonXY))
+//         return true;
 
-    // 否则计算到多边形边的最小距离
-    double minDist = std::numeric_limits<double>::max();
-    int n = area.polygonXY.size();
-    for (int i = 0; i < n; ++i)
-    {
-        const auto &p1 = area.polygonXY[i];
-        const auto &p2 = area.polygonXY[(i + 1) % n];
-        double dist = distancePointToSegment(px, py, p1.first, p1.second, p2.first, p2.second);
+//     // 否则计算到多边形边的最小距离
+//     double minDist = std::numeric_limits<double>::max();
+//     int n = area.polygonXY.size();
+//     for (int i = 0; i < n; ++i)
+//     {
+//         const auto &p1 = area.polygonXY[i];
+//         const auto &p2 = area.polygonXY[(i + 1) % n];
+//         double dist = distancePointToSegment(px, py, p1.first, p1.second, p2.first, p2.second);
 
-        if (dist < minDist)
-            minDist = dist;
+//         if (dist < minDist)
+//             minDist = dist;
 
-        // 提前退出
-        if (minDist <= toleranceMeters)
-            return true;
-    }
+//         // 提前退出
+//         if (minDist <= toleranceMeters)
+//             return true;
+//     }
 
-    return minDist <= toleranceMeters;
-}
+//     return minDist <= toleranceMeters;
+// }
 
-/*
-bool MqttTransport::isInAreaBuffered(const Point& pt, double toleranceMeters)
-{
-    for (const auto& [id, area] : areaMap)
-    {
-        if (area.polygon.empty())
-            continue;
-        if (isPointInPolygonGeoBuffered(pt, area.polygon, toleranceMeters))
-        {
-            //std::cout << "[isInAreaBuffered] point in area: " << id << std::endl;
-            return true;
-        }
-    }
-    return false;
-}*/
+// /*
+// bool MqttTransport::isInAreaBuffered(const Point& pt, double toleranceMeters)
+// {
+//     for (const auto& [id, area] : areaMap)
+//     {
+//         if (area.polygon.empty())
+//             continue;
+//         if (isPointInPolygonGeoBuffered(pt, area.polygon, toleranceMeters))
+//         {
+//             //std::cout << "[isInAreaBuffered] point in area: " << id << std::endl;
+//             return true;
+//         }
+//     }
+//     return false;
+// }*/
 
-/*
-bool MqttTransport::isInAreaBuffered(const Point& pt, double toleranceMeters)
-{
-    for (const auto& [id, area] : areaMap)
-    {
-        if (area.polygon.empty())
-            continue;
+// /*
+// bool MqttTransport::isInAreaBuffered(const Point& pt, double toleranceMeters)
+// {
+//     for (const auto& [id, area] : areaMap)
+//     {
+//         if (area.polygon.empty())
+//             continue;
 
-        // 包围盒粗过滤
-        if (pt.lat < area.minLat - 0.001 || pt.lat > area.maxLat + 0.001 ||
-            pt.lon < area.minLon - 0.001 || pt.lon > area.maxLon + 0.001)
-            continue;
+//         // 包围盒粗过滤
+//         if (pt.lat < area.minLat - 0.001 || pt.lat > area.maxLat + 0.001 ||
+//             pt.lon < area.minLon - 0.001 || pt.lon > area.maxLon + 0.001)
+//             continue;
 
-        // 投影点
-        double px, py, pz;
-        area.proj.Forward(pt.lat, pt.lon, 0, px, py, pz);
+//         // 投影点
+//         double px, py, pz;
+//         area.proj.Forward(pt.lat, pt.lon, 0, px, py, pz);
 
-        // 在多边形内
-        if (isPointInPolygonXY(px, py, area.polygonXY))
-            return true;
+//         // 在多边形内
+//         if (isPointInPolygonXY(px, py, area.polygonXY))
+//             return true;
 
-        // 检查边的最小距离
-        double minDist = std::numeric_limits<double>::max();
-        int n = area.polygonXY.size();
-        for (int i = 0; i < n; ++i)
-        {
-            const auto& p1 = area.polygonXY[i];
-            const auto& p2 = area.polygonXY[(i + 1) % n];
-            double dist = distancePointToSegment(px, py, p1.first, p1.second, p2.first, p2.second);
-            if (dist < minDist)
-                minDist = dist;
-        }
+//         // 检查边的最小距离
+//         double minDist = std::numeric_limits<double>::max();
+//         int n = area.polygonXY.size();
+//         for (int i = 0; i < n; ++i)
+//         {
+//             const auto& p1 = area.polygonXY[i];
+//             const auto& p2 = area.polygonXY[(i + 1) % n];
+//             double dist = distancePointToSegment(px, py, p1.first, p1.second, p2.first, p2.second);
+//             if (dist < minDist)
+//                 minDist = dist;
+//         }
 
-        if (minDist <= toleranceMeters)
-            return true;
-    }
-    return false;
-}
-*/
+//         if (minDist <= toleranceMeters)
+//             return true;
+//     }
+//     return false;
+// }
+// */
 
-// v2
-bool MqttTransport::isInAreaBuffered(const Point &pt, double toleranceMeters)
-{
-    // 经纬度缓冲值（米转度）
-    double latTol = toleranceMeters / 111000.0;
-    double lonTol = toleranceMeters / (111000.0 * cos(pt.lat * M_PI / 180.0));
+// // v2
+// bool MqttTransport::isInAreaBuffered(const Point &pt, double toleranceMeters)
+// {
+//     // 经纬度缓冲值（米转度）
+//     double latTol = toleranceMeters / 111000.0;
+//     double lonTol = toleranceMeters / (111000.0 * cos(pt.lat * M_PI / 180.0));
 
-    for (const auto &[id, area] : areaMap)
-    {
-        if (area.polygon.empty())
-            continue;
+//     for (const auto &[id, area] : areaMap)
+//     {
+//         if (area.polygon.empty())
+//             continue;
 
-        // 包围盒快速过滤
-        if (pt.lat < area.minLat - latTol || pt.lat > area.maxLat + latTol || pt.lon < area.minLon - lonTol ||
-            pt.lon > area.maxLon + lonTol)
-            continue;
+//         // 包围盒快速过滤
+//         if (pt.lat < area.minLat - latTol || pt.lat > area.maxLat + latTol || pt.lon < area.minLon - lonTol ||
+//             pt.lon > area.maxLon + lonTol)
+//             continue;
 
-        if (isPointInPolygonGeoBuffered(pt, area, toleranceMeters))
-            return true;
-    }
-    return false;
-}
+//         if (isPointInPolygonGeoBuffered(pt, area, toleranceMeters))
+//             return true;
+//     }
+//     return false;
+// }
 
-void MqttTransport::prepareAreaCache()
-{
-    for (auto &[id, area] : areaMap)
-    {
-        if (area.polygon.empty())
-            continue;
+// void MqttTransport::prepareAreaCache()
+// {
+//     for (auto &[id, area] : areaMap)
+//     {
+//         if (area.polygon.empty())
+//             continue;
 
-        // 计算包围盒
-        area.minLat = area.maxLat = area.polygon[0].lat;
-        area.minLon = area.maxLon = area.polygon[0].lon;
-        for (auto &p : area.polygon)
-        {
-            area.minLat = std::min(area.minLat, p.lat);
-            area.maxLat = std::max(area.maxLat, p.lat);
-            area.minLon = std::min(area.minLon, p.lon);
-            area.maxLon = std::max(area.maxLon, p.lon);
-        }
+//         // 计算包围盒
+//         area.minLat = area.maxLat = area.polygon[0].lat;
+//         area.minLon = area.maxLon = area.polygon[0].lon;
+//         for (auto &p : area.polygon)
+//         {
+//             area.minLat = std::min(area.minLat, p.lat);
+//             area.maxLat = std::max(area.maxLat, p.lat);
+//             area.minLon = std::min(area.minLon, p.lon);
+//             area.maxLon = std::max(area.maxLon, p.lon);
+//         }
 
-        // 初始化投影
-        area.proj.Reset(area.polygon[0].lat, area.polygon[0].lon, 0);
+//         // 初始化投影
+//         area.proj.Reset(area.polygon[0].lat, area.polygon[0].lon, 0);
 
-        // 缓存局部坐标
-        area.polygonXY.clear();
-        for (auto &p : area.polygon)
-        {
-            double x, y, z;
-            area.proj.Forward(p.lat, p.lon, 0, x, y, z);
-            area.polygonXY.emplace_back(x, y);
-        }
-    }
-}
+//         // 缓存局部坐标
+//         area.polygonXY.clear();
+//         for (auto &p : area.polygon)
+//         {
+//             double x, y, z;
+//             area.proj.Forward(p.lat, p.lon, 0, x, y, z);
+//             area.polygonXY.emplace_back(x, y);
+//         }
+//     }
+// }

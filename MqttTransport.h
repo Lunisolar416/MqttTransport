@@ -2,7 +2,9 @@
 #define MQTTSUBSCRIBER_H
 
 #include "GeoUtils.h"
+#include "polygon_point_singleton.h"
 #include "protocal.h"
+#include <Eigen/Dense>
 #include <GeographicLib/LocalCartesian.hpp>
 #include <cstdint>
 #include <functional>
@@ -134,17 +136,17 @@ class MqttTransport : public virtual mqtt::callback, public virtual mqtt::iactio
 
     // distance
 
-    // position
-    bool isPointInPolygonXY(double x, double y, const std::vector<std::pair<double, double>> &polygonXY);
-    bool isPointInPolygonGeo(const Point &pt, const std::vector<Point> &polygon);
-    bool isInArea(const Point &pt);
-    double distancePointToSegment(double px, double py, double x1, double y1, double x2, double y2);
-    // bool isPointInPolygonGeoBuffered(const Point& pt,const std::vector<Point>& polygon,double toleranceMeters);
-    bool isPointInPolygonGeoBuffered(const Point &pt, const Area &area, double toleranceMeters);
+    // // position
+    // bool isPointInPolygonXY(double x, double y, const std::vector<std::pair<double, double>> &polygonXY);
+    // bool isPointInPolygonGeo(const Point &pt, const std::vector<Point> &polygon);
+    // bool isInArea(const Point &pt);
+    // double distancePointToSegment(double px, double py, double x1, double y1, double x2, double y2);
+    // // bool isPointInPolygonGeoBuffered(const Point& pt,const std::vector<Point>& polygon,double toleranceMeters);
+    // bool isPointInPolygonGeoBuffered(const Point &pt, const Area &area, double toleranceMeters);
 
-    bool isInAreaBuffered(const Point &pt, double toleranceMeters);
+    // bool isInAreaBuffered(const Point &pt, double toleranceMeters);
 
-    void prepareAreaCache();
+    // void prepareAreaCache();
 
   private:
     // subscribe to receive outenv data
@@ -190,9 +192,6 @@ class MqttTransport : public virtual mqtt::callback, public virtual mqtt::iactio
 
     // Course
     std::unordered_map<uint16_t, double> courses_;
-
-    // position
-    std::unordered_map<int, Area> areaMap;
 };
 
 #endif // MQTTSUBSCRIBER_H

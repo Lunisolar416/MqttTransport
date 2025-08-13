@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/publisher_0042.dir/pub.cc.o CMakeFiles/publisher_0042.dir/polygon_point_singleton.cc.o -o publisher_0042  -lpaho-mqttpp3 -lpaho-mqtt3as -lpthread 

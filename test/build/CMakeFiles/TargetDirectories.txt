@@ -1,0 +1,4 @@
+/home/ubuntu/cpp/src/test/build/CMakeFiles/test_polygon.dir
+/home/ubuntu/cpp/src/test/build/CMakeFiles/publisher_0042.dir
+/home/ubuntu/cpp/src/test/build/CMakeFiles/edit_cache.dir
+/home/ubuntu/cpp/src/test/build/CMakeFiles/rebuild_cache.dir
