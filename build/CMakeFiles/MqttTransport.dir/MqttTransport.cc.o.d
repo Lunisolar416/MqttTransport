@@ -493,10 +493,6 @@ CMakeFiles/MqttTransport.dir/MqttTransport.cc.o: \
  /usr/local/include/nlohmann/ordered_map.hpp /usr/include/c++/13/any \
  /usr/local/include/nlohmann/detail/macro_unscope.hpp \
  /usr/local/include/nlohmann/thirdparty/hedley/hedley_undef.hpp \
- /usr/include/GeographicLib/LocalCartesian.hpp \
- /usr/include/GeographicLib/Geocentric.hpp \
- /usr/include/GeographicLib/Constants.hpp \
- /usr/include/GeographicLib/Config.h /usr/include/GeographicLib/Math.hpp \
  /usr/local/include/mqtt/async_client.h /usr/include/c++/13/list \
  /usr/include/c++/13/bits/stl_list.h /usr/include/c++/13/bits/list.tcc \
  /usr/local/include/MQTTAsync.h \
